@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+db.sqlite3
+*.log
+
+env/
+.vscode/
+.DS_Store
+
+# 忽略巨大的生信原始数据，只传代码
+*.fastq
+*.fq
+*.bam
+*.vcf
+*.gz
