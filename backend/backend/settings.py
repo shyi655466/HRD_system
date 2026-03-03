@@ -39,9 +39,20 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
-
     'analysis',
 ]
+
+REST_FRAMEWORK = {
+    # 1. 全局权限配置：默认所有接口都需要身份认证 (IsAuthenticated)
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    # 2. 身份认证方式：优先使用 JWT，其次是传统的 Session (方便我们在浏览器后台调试)
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -144,3 +155,30 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# 配置 JWT 参数
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    # Access Token (访问令牌) 的有效期。为了你开发测试方便，先设为 1 天。
+    # 等毕设上线时，可以改成 60 分钟以提高安全性。
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    
+    # Refresh Token (刷新令牌) 的有效期。用于当 Access Token 过期时，静默换取新令牌。
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    
+    # 令牌前缀，前端发送请求时通常写成 "Bearer xxxx.yyyy.zzzz"
+    'AUTH_HEADER_TYPES': ('Bearer',), 
+}
+
+# 配置 Celery 
+# 消息代理 (Broker) 是本地的 Redis，端口 6379，数据库 0
+CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
+# 结果也存回 Redis (数据库 1)
+CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
+# 接受的内容格式
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+# 时区与 Django 保持一致
+CELERY_TIMEZONE = 'Asia/Shanghai'

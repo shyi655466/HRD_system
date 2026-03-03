@@ -16,8 +16,18 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from rest_framework_simplejwt.views import (  # 导入 JWT 提供的现成视图
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('analysis.urls')), 
+    path('api/', include('analysis.urls')),
+    
+    # --- 新增 JWT 登录与刷新接口 ---
+    # 这个接口的作用就是：你给它 post 用户名和密码，它还给你一个 Token
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # 这个接口用于刷新 Token
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
