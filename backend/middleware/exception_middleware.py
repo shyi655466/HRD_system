@@ -1,0 +1,39 @@
+# 文件路径: middleware/exception_middleware.py
+from django.http import JsonResponse
+from utils.logger import logger
+import traceback
+
+class GlobalExceptionMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # 请求到达视图（View）之前的操作可以写在这里
+        logger.info(f"收到请求: {request.method} {request.path}")
+        
+        response = self.get_response(request)
+        
+        # 响应返回前端之前的操作可以写在这里
+        return response
+
+    def process_exception(self, request, exception):
+        """
+        核心方法：当 Django 内部（包括你的 API、Celery 调度代码）发生任何未捕获的异常时，都会触发这里。
+        """
+        # 1. 把详细的错误堆栈写入我们的 app_error.log 中
+        logger.error(f"捕获到全局异常: 接口 [{request.path}]")
+        logger.error(f"错误详情: {str(exception)}")
+        logger.error(traceback.format_exc()) # 打印完整的追踪信息，方便找Bug
+
+        # 2. 拦截错误，不向前端暴露系统的物理路径和 500 黄页，而是返回我们定义的标准 JSON 格式
+        # 这里的格式必须和前端约定好
+        response_data = {
+            "code": 5000, # 我们可以定义 5000 代表系统内部错误
+            "status": "error",
+            "message": f"系统运行异常，请联系管理员或查看日志。错误摘要: {str(exception)}",
+            "data": None
+        }
+        
+        # 返回 200 状态码但包含错误 code，或者直接返回 500 状态码，取决于你的前端 axios 怎么配置
+        # 通常现代前后端分离项目习惯返回 200 HTTP 状态，在业务 code 里标识错误
+        return JsonResponse(response_data, status=200, json_dumps_params={'ensure_ascii': False})

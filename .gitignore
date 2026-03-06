@@ -6,7 +6,7 @@ db.sqlite3
 
 env/
 .vscode/
-.DS_Store
+dump.rdb
 
 # 忽略巨大的生信原始数据，只传代码
 *.fastq
