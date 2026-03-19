@@ -11,6 +11,12 @@ const routes = [
                 path: '',
                 name: 'Dashboard',
                 component: () => import('../views/Dashboard.vue')
+            },
+            // “临床样本管理”路由户口
+            {
+                path: '/samples', 
+                name: 'Samples',
+                component: () => import('../views/Samples.vue')
             }
         ]
     },

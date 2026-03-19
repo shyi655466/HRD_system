@@ -11,7 +11,7 @@ const app = createApp(App)
 
 // 依次挂载
 app.use(router)
-app.use(createPinia)
+app.use(createPinia())
 app.use(ElementPlus)
 
 app.mount('#app')

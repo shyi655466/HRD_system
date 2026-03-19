@@ -8,7 +8,7 @@
                 router 表示启用 vue-router 路由模式
                 点击菜单项时，会根据 index 自动跳转到对应路由
             -->
-            <el-menu default-active="/" router="true" class="el-menu-vertical">
+            <el-menu default-active="/" router class="el-menu-vertical">
                 <!-- 第一个菜单项 点击后跳转到根路径 / -->
                 <el-menu-item index="/">
                     <!--

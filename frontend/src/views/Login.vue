@@ -1,3 +1,14 @@
+<!--
+    页面中间显示一个登录卡片
+    用户输入用户名和密码
+    点击登录按钮或按 Enter
+    先进行表单验证
+    验证通过后显示 loading
+    模拟请求 1 秒
+    弹出登录成功提示
+    跳转到首页 /
+-->
+
 <template>
     <!-- 定义外层容器包住整个登录页面 -->
     <div class="login-container">
@@ -69,7 +80,7 @@ const loginRules = reactive({
 })
 
 const handleLogin = () => {
-    if(!loginFormRef.value) reture
+    if(!loginFormRef.value) return
 
     loginFormRef.value.validate((valid) => {
         if(valid) {
