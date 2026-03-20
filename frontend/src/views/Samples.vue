@@ -60,6 +60,7 @@
                         <!-- type表示按钮风格样式 link表示按钮为链接样式-->
                         <el-button size="small" type="primary" link :disabled="scope.row.status !== 'success'">查看报告</el-button>
                         <el-button size="small" type="primary" link :disabled="scope.row.status !== 'success'">下载JSON</el-button>
+                        <el-button size="small" type="small" link @click="goToDetail(scope.row)">查看详情</el-button>
                     </template>
                 </el-table-column>                                                                                           
             </el-table>
@@ -121,6 +122,14 @@
 import { ref, computed, reactive } from 'vue'
 import { Search, Plus, Download, UploadFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+// 点击“查看详情”时 跳转到对应样本的详情页地址
+const goToDetail = (row) => {
+    router.push('/samples/${row.sampleId}')
+}
 
 const searchQuery = ref('')  // 搜索框
 const statusFilter = ref('')  // 状态筛选框
@@ -130,12 +139,18 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 
 const tableData = ref([
-    { sampleId: 'SEQ-20260315-01', patientName: '张**', uploadTime: '2026-03-15 10:23:11', status: 'success', hrdScore: 54, operator: 'Dr. Admin' },
-    { sampleId: 'SEQ-20260315-02', patientName: '李**', uploadTime: '2026-03-15 11:05:42', status: 'success', hrdScore: 28, operator: 'Dr. Admin' },
-    { sampleId: 'SEQ-20260316-01', patientName: '王**', uploadTime: '2026-03-16 09:12:00', status: 'running', hrdScore: null, operator: 'Dr. Admin' },
-    { sampleId: 'SEQ-20260316-02', patientName: '赵**', uploadTime: '2026-03-16 09:15:30', status: 'pending', hrdScore: null, operator: 'Dr. Admin' },
-    { sampleId: 'SEQ-20260316-03', patientName: '陈**', uploadTime: '2026-03-16 09:40:11', status: 'error', hrdScore: null, operator: 'Dr. Admin' },
-    { sampleId: 'SEQ-20260317-01', patientName: '刘**', uploadTime: '2026-03-17 08:30:00', status: 'success', hrdScore: 61, operator: 'Dr. Admin' },
+    { sampleId: `SEQ-20260315-01`, patientName: '张**', uploadTime: '2026-03-15 10:23:11', status: 'success', hrdScore: 54, operator: 'Dr. Admin', 
+    fileName: 'patient_001.vcf.gz', fileSize: '1.86 GB', loh: 18, tai: 21, lst: 15, summary: '该样本 HRD 综合评分较高，提示存在同源重组修复缺陷倾向。' },
+    { sampleId: `SEQ-20260315-02`, patientName: '李**', uploadTime: '2026-03-15 11:05:42', status: 'success', hrdScore: 28, operator: 'Dr. Admin',   
+    fileName: 'patient_002.vcf.gz', fileSize: '1.86 GB', loh: 18, tai: 21, lst: 15, summary: '该样本 HRD 综合评分较高，提示存在同源重组修复缺陷倾向。' },
+    { sampleId: `SEQ-20260316-01`, patientName: '王**', uploadTime: '2026-03-16 09:12:00', status: 'running', hrdScore: null, operator: 'Dr. Admin',
+    fileName: 'patient_003.vcf.gz', fileSize: '1.86 GB', loh: 18, tai: 21, lst: 15, summary: '该样本 HRD 综合评分较高，提示存在同源重组修复缺陷倾向。' },
+    { sampleId: `SEQ-20260316-02`, patientName: '赵**', uploadTime: '2026-03-16 09:15:30', status: 'pending', hrdScore: null, operator: 'Dr. Admin',
+    fileName: 'patient_004.vcf.gz', fileSize: '1.86 GB', loh: 18, tai: 21, lst: 15, summary: '该样本 HRD 综合评分较高，提示存在同源重组修复缺陷倾向。' },
+    { sampleId: `SEQ-20260316-03`, patientName: '陈**', uploadTime: '2026-03-16 09:40:11', status: 'error', hrdScore: null, operator: 'Dr. Admin', 
+    fileName: 'patient_005.vcf.gz', fileSize: '1.86 GB', loh: 18, tai: 21, lst: 15, summary: '该样本 HRD 综合评分较高，提示存在同源重组修复缺陷倾向。' },
+    { sampleId: `SEQ-20260317-01`, patientName: '刘**', uploadTime: '2026-03-17 08:30:00', status: 'success', hrdScore: 61, operator: 'Dr. Admin',
+    fileName: 'patient_006.vcf.gz', fileSize: '1.86 GB', loh: 18, tai: 21, lst: 15, summary: '该样本 HRD 综合评分较高，提示存在同源重组修复缺陷倾向。' },
 ])
 
 const filteredTableData = computed(() => {
@@ -178,35 +193,6 @@ const handleFileChange = (uploadFile) => {
     selectedFile.value = file
     uploadProgress.value = 0
     uploadStatus.value = ''
-
-    // 这里我们用定时器模拟分片上传的进度
-    let currentChunk = 0
-    const totalChunks = 100 // 假装切了 100 片
-    
-    const timer = setInterval(() => {
-        currentChunk += Math.floor(Math.random() * 10) + 1 // 模拟网速波动
-        if (currentChunk >= totalChunks) {
-        currentChunk = totalChunks
-        clearInterval(timer)
-        uploadStatus.value = 'success'
-        uploading.value = false
-        ElMessage.success('文件上传完毕！任务已加入 Celery 队列进行分析。')
-        
-        // 模拟将新任务加到表格里
-        setTimeout(() => {
-            dialogVisible.value = false
-            tableData.value.unshift({
-            sampleId: `SEQ-202603${Math.floor(Math.random() * 100)}`,
-            patientName: newTask.patientName,
-            uploadTime: new Date().toLocaleString(),
-            status: 'pending',
-            hrdScore: null,
-            operator: 'Dr. Admin'
-            })
-        }, 1000)
-        }
-        uploadProgress.value = currentChunk
-    }, 200) // 每 0.2 秒推进一次进度
 }
 
 const startMockUpload = () => {
@@ -217,6 +203,7 @@ const startMockUpload = () => {
 
     if (!selectedFile.value) {
         ElMessage.warning('请先选择测序文件')
+        return
     }
 
     uploading.value = true
@@ -246,7 +233,13 @@ const startMockUpload = () => {
                 uploadTime: new Date().toLocaleString(),
                 status: 'pending',
                 hrdScore: null,
-                operator: 'Dr. Admin'
+                operator: 'Dr. Admin',
+                fileName: selectedFile.value?.name || '',
+                fileSize: selectedFile.value ? `${(selectedFile.value.size / 1024 / 1024).toFixed(2)} MB` : '',
+                loh: null,
+                tai: null,
+                lst: null,
+                summary: ''
             })
             
             setTimeout(() => {

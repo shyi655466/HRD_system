@@ -17,6 +17,12 @@ const routes = [
                 path: '/samples', 
                 name: 'Samples',
                 component: () => import('../views/Samples.vue')
+            },
+            // 样本编号
+            {
+                path: '/samples/:id',
+                name: 'SampleDetail',
+                component: () => import('../views/SampleDetail.vue')
             }
         ]
     },
