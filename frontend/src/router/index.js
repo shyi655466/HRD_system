@@ -23,7 +23,13 @@ const routes = [
                 path: '/samples/:id',
                 name: 'SampleDetail',
                 component: () => import('../views/SampleDetail.vue')
-            }
+            },
+            // 查看完整报告
+            {
+                path: '/results/:id',
+                name: 'AnalysisResult',
+                component: () => import('../views/AnalysisResult.vue')
+            },
         ]
     },
     {

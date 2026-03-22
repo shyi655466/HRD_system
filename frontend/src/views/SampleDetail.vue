@@ -23,7 +23,7 @@
                 <el-button>重新加载状态</el-button>
                 <el-button>重新分析</el-button>
                 <el-button>下载 JSON</el-button>
-                <el-button>查看完整报告</el-button>
+                <el-button @click="goToResult">查看完整报告</el-button>
             </div>
         </el-card>
 
@@ -243,6 +243,10 @@ const progressText = computed(() => {
 
 const goBack = () => {
     router.push('/sample')
+}
+
+const goToResult = () => {
+    router.push(`/results/${sample.sampleId}`)
 }
 </script>
 
