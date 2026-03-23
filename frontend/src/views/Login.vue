@@ -57,6 +57,9 @@ import { User, Lock } from '@element-plus/icons-vue'
 // 导入消息提示组件 作用是弹出登录成功/失败提示
 import { ElMessage } from 'element-plus'
 
+import request from '../utils/request'
+import { setToken } from '../utils/auth'
+
 const router = useRouter()
 const loginFormRef = ref(null)
 const loading = ref(false)
@@ -71,31 +74,35 @@ const loginRules = reactive({
     username: [
         // 必填 校验失败时的提示 在失去焦点时触发校验
         { required: true, message: '用户名不能为空', trigger: 'blur' },
-        { min: 8, max: 20, message: '用户名长度需在8到20个字符之间', trigger: 'blur' }
+        { min: 3, max: 20, message: '用户名长度需在3到20个字符之间', trigger: 'blur' }
     ],
     password: [
         { required: true, message: '密码不能为空', trigger: 'blur' },
-        { min: 8, max: 20, message: '密码长度需在8到20个字符之间', trigger: 'blur' }
+        { min: 6, max: 20, message: '密码长度需在6到20个字符之间', trigger: 'blur' }
     ]
 })
 
-const handleLogin = () => {
-    if(!loginFormRef.value) return
+// 默认对接后端JWT登录接口/api/token/
+const handleLogin = async () => {
+  if (!loginFormRef.value) return
 
-    loginFormRef.value.validate((valid) => {
-        if(valid) {
-            loading.value = true
-            // 模拟向后端发送API请求的过程（延时1秒）
-            setTimeout(() => {
-                loading.value = false
-                ElMessage.success('登录成功！欢迎回来')
-                router.push('/')
-            }, 1000)
-        } else {
-            ElMessage.error('请正确填写账号和密码格式')
-            return false
-        }
-    })
+  await loginFormRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    try {
+      const res = await request.post('/api/token/', {
+        username: loginForm.username,
+        password: loginForm.password,
+      })
+
+      setToken(res.access)
+      ElMessage.success('登录成功')
+      router.push('/')
+    } catch (error) {
+      // 错误提示已经在 request.js 里统一处理了
+      console.error('登录失败', error)
+    }
+  })
 }
 </script>
 

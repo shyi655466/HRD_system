@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Layout from '../layout/index.vue'
+import { hasToken } from '../utils/auth'
 
 // 定义常量 routes 为数组，数组中的每一个对象，代表一条路由规则
 const routes = [
@@ -41,7 +42,19 @@ const routes = [
 
 const router = createRouter({
     history: createWebHistory(),
-    routes
+    routes,
+})
+
+router.beforeEach((to, from, next) => {
+    if(to.path === '/login') {
+        next()
+        return
+    }
+    if(!hasToken()) {
+        next('/login')
+        return
+    }
+    next()
 })
 
 export default router
