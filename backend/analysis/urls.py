@@ -11,6 +11,9 @@ urlpatterns = [
     # 对 id 为 pk 的样本，执行 run 动作
     path('samples/<uuid:pk>/run/', StartAnalysisView.as_view(), name='sample-run'),
 
-    # 语义：对 id 为 pk 的样本，执行 result 回传
+    # 对 id 为 pk 的样本，执行 result 回传
     path('samples/<uuid:pk>/result/', SubmitResultView.as_view(), name='sample-result'),
+
+    # 对 id 为 pk 的样本，执行 start-analysis 动作
+    path('samples/<uuid:pk>/start-analysis/', StartAnalysisView.as_view(), name='start-analysis'),
 ]

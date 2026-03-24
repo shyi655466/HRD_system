@@ -1,6 +1,6 @@
 
 <template>
-    <div class="detail-container">
+    <div class="detail-container" v-loading="loading">
         <!-- 页面头部 -->
         <div class="page-header">
             <div>
@@ -9,178 +9,128 @@
             </div>
             <div class="header-actions">
                 <el-button @click="goBack">返回列表</el-button>
-                <el-button type="primary" :disabled="sample.status !== 'success'">查看完整报告</el-button>
+                <el-button type="primary" :disabled="!canStartAnalysis" :loading="actionLoading" @click="handleStartAnalysis">开始分析</el-button>
             </div>
         </div>
 
-         <!-- 操作区 -->
-        <el-card shadow="never" class="section-card action-card">
-            <template #header>
-                <div class="section-header">操作区</div>
-            </template>
-
-            <div class="action-buttons">
-                <el-button>重新加载状态</el-button>
-                <el-button>重新分析</el-button>
-                <el-button>下载 JSON</el-button>
-                <el-button @click="goToResult">查看完整报告</el-button>
-            </div>
-        </el-card>
-
-        <!-- 基础信息 -->
-        <el-card shadow="never" class="section-card">
-            <template #header>
-                <div class="section-header">基础信息</div>
-            </template>
-
-            <el-row :gutter="20">
-                <el-col :span="8">
-                    <div class="info-item">
-                        <span class="label">样本编号</span>
-                        <span class="value">{{ sample.sampleId }}</span>
-                    </div>
-                </el-col>
-                <el-col :span="8">
-                    <div class="info-item">
-                        <span class="label">患者姓名</span>
-                        <span class="value">{{ sample.patientName }}</span>
-                    </div>
-                </el-col>
-                <el-col :span="8">
-                    <div class="info-item">
-                       <span class="label">操作人</span>
-                       <span class="value">{{ sample.operator }}</span>
-                    </div>
-                </el-col>
-                <el-col :span="8">
-                    <div class="info-item">
-                        <span class="label">上传时间</span>
-                        <span class="value">{{ sample.uploadTime }}</span>
-                    </div>
-                </el-col>
-                <el-col :span="8">
-                    <div class="info-item">
-                        <span class="label">文件名称</span>
-                        <span class="value">{{ sample.fileName }}</span>
-                    </div>
-                </el-col>
-                <el-col :span="8">
-                    <div class="info-item">
-                        <span class="label">文件大小</span>
-                        <span class="value">{{ sample.fileSize }}</span>
-                    </div>
-                </el-col>
-            </el-row>
-        </el-card>
-
-        <!-- 状态概览 -->
-        <el-row :gutter="20" class="overview-card">
-            <el-col :span="8">
-                <el-card shadow="hover" class="overview-card">
-                    <div class="overview-label">当前分析状态</div>
-                    <div class="overview-value">
-                        <el-tag v-if="sample.status === 'success'" type="success" size="large">已完成</el-tag>
-                        <el-tag v-else-if="sample.status === 'running'" type="primary" size="large">计算中</el-tag>
-                        <el-tag v-else-if="sample.status === 'pending'" type="warning" size="large">排队中</el-tag>
-                        <el-tag v-else-if="sample.status === 'error'" type="danger" size="large">失败</el-tag>
-                    </div>
-                    <div class="overview-footer">任务提交后由 Celery 异步调度执行</div>
-                </el-card>
-            </el-col>
-
-            <el-col :span="8">
-                <el-card shadow="hover" class="overview-card">
-                    <div class="overview-label">HRD 评分</div>
-                    <div class="overview-value">
-                        <span v-if="sample.status !== 'success'">--</span>
-                        <span v-else :class="{ 'high-score': sample.hrdscore >= 42 }">
-                            {{ sample.hrdScore }}
-                        </span>
-                    </div>
-                    <div class="overview-footer">
-                        <span v-if="sample.status !== 'success'">分析完成后显示</span>
-                        <span v-else>
-                            {{ sample.hrdScore >=42 ? '提示 HRD 阳性倾向' : '提示 HRD 阴性倾向' }}
-                        </span>
-                    </div>
-                </el-card>
-            </el-col>
-
-            <el-col :span="8">
-                <el-card shadow="hover" class="overview-card">
-                    <div class="overview-label">任务进度</div>
-                    <div class="overview-value">
-                        {{ progressText }}
-                    </div>
-                    <div class="overview-footer">
-                        <el-progress :percentage="progressPercentage" :status="progressStatus" :stroke-width="14" />
-                    </div>
-                </el-card>
-            </el-col>
-        </el-row>
-
-        <!-- 详细结果 + 运行记录 -->
-        <el-row :gutter="20" class="content-row">
-            <!-- 结果摘要 -->
-            <el-col :span="16">
-                <el-card shadow="never" class="section-card">
+        <el-row :gutter="20">
+            <el-col :xs="24" :lg="16">
+                <el-card shadow="hover" class="detail-card">
                     <template #header>
-                        <div class="section-header">分析结果摘要</div>
+                        <div class="card-header">基础信息</div>
                     </template>
 
-                    <div v-if="sample.status === 'success'">
-                        <el-row :gutter="20" class="metric-row">
-                            <el-col :span="8">
-                                <div class="metric-card">
-                                    <div class="metric-label">LOH</div>
-                                    <div class="metric-value">{{ result.loh }}</div>
-                                </div>
-                            </el-col>
-                            <el-col :span="8">
-                                <div class="metric-card">
-                                    <div class="metric-label">TAI</div>
-                                    <div class="metric-value">{{ result.tai }}</div>
-                                </div>
-                            </el-col>
-                            <el-col :span="8">
-                                <div class="metric-card">
-                                    <div class="metric-label">LST</div>
-                                    <div class="metric-value">{{ result.lst }}</div>
-                                </div>
-                            </el-col>
-                        </el-row>
+                    <el-descriptions :column="2" border v-if="sampleDetail">
+                        <el-descriptions-item label="样本ID">
+                            {{ sampleDetail.id }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="患者编号">
+                            {{ sampleDetail.patientId || '-' }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="样本编号">
+                            {{ sampleDetail.sampleCode || '-' }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="创建时间">
+                            {{ formatDate(sampleDetail.createdAt) }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="当前状态">
+                            <el-tag :type="statusTagType(sampleDetail.status)" effect="light">
+                                {{ statusText(sampleDetail.status) }}
+                            </el-tag>
+                        </el-descriptions-item>
+                    </el-descriptions>
+                </el-card>
 
-                        <el-descriptions :column="1" border class="result-desc">
-                            <el-descriptions-item label="HRD 评分">
-                                {{ sample.hrdScore }}
-                            </el-descriptions-item>
-                            <el-descriptions-item label="结果判定">
-                                <el-tag :type="sample.hrdScore >= 42 ? 'danger' : 'success'">
-                                    {{ sample.hrdScore >= 42 ? 'HRD 阳性' : 'HRD 阴性' }}
+                <el-card shadow="hover" class="detail-card">
+                    <template #header>
+                        <div class="card-header">分析记录</div>
+                    </template>
+
+                    <el-table :data="sampleDetail?.tasks || []" stripe style="width: 100%" empty-text="暂无分析记录">
+                        <el-table-column prop="id" label="任务ID" width="100" />
+                        <el-table-column label="任务状态" width="140">
+                            <template #default="scope">
+                                <el-tag :type="taskTagType(scope.row.status)" effect="light">
+                                    {{ scope.row.status }}
                                 </el-tag>
-                            </el-descriptions-item>
-                            <el-descriptions-item label="结果说明">
-                                {{ result.summary }}
-                            </el-descriptions-item>
-                        </el-descriptions>
-                    </div>
-
-                    <el-empty v-else description="当前样本尚未生成分析结果" />
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="创建时间" min-width="180">
+                            <template #default="scope">
+                                {{ formatDate(scope.row.createdAt) }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="日志输出" min-width="240">
+                            <template #default="scope">
+                                {{ scope.row.logOutput || '-' }}
+                            </template>
+                        </el-table-column>
+                    </el-table>
                 </el-card>
             </el-col>
 
-            <!-- 运行记录 -->
-            <el-col :span="8">
-                <el-card shadow="never" class="section-card">
+            <el-col :xs="24" :lg="8">
+                <el-card shadow="hover" class="detail-card">
                     <template #header>
-                        <div class="section-header">运行记录</div>
+                        <div class="card-header">状态概览</div>
                     </template>
 
-                    <el-timeline>
-                        <el-timeline-item v-for="(item, index) in timeline" :key="index" :timestamp="item.time" :type="item.type" >
-                            {{ item.content }}
-                        </el-timeline-item>
-                    </el-timeline>
+                    <div class="overview-list" v-if="sampleDetail">
+                        <div class="overview-item">
+                            <span class="overview-label">分析状态
+                                <el-tag :type="statusTagType(sampleDetail.status)" effect="light">
+                                    {{ statusText(sampleDetail.status) }}
+                                </el-tag>
+                            </span>
+                        </div>
+
+                        <div class="overview-item">
+                            <span class="overview-label">任务数量</span>
+                            <span class="overview-value">{{ sampleDetail.tasks?.length || 0 }}</span>
+                        </div>
+
+                        <div class="overview-item">
+                            <span class="overview-label">最近任务</span>
+                            <span class="overview-value">
+                                {{ sampleDetail.tasks?.[0]?.status || '-' }}
+                            </span>
+                        </div>
+                    </div>
+                </el-card>
+
+                <el-card shadow="hover" class="detail-card result-card">
+                    <template #header>
+                        <div class="card-header">结果摘要</div>
+                    </template>
+
+                    <div v-if="sampleDetail?.result" class="result-list">
+                        <div class="result-item">
+                            <span class="result-label">HRD评分</span>
+                            <span class="result-value">{{ sampleDetail.result.hrdScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">LOH评分</span>
+                            <span class="result-value">{{ sampleDetail.result.lohScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">TAI评分</span>
+                            <span class="result-value">{{ sampleDetail.result.taiScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">LST评分</span>
+                            <span class="result-value">{{ sampleDetail.result.lstScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">BRCA状态</span>
+                            <span class="result-value">{{ sampleDetail.result.brcaStatus ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">分析时间</span>
+                            <span class="result-value">{{ formatDate(sampleDetail.result.analysisDate) }}</span>
+                        </div>
+                    </div>
+
+                    <el-empty v-else description="暂无分析结果" />
                 </el-card>
             </el-col>
         </el-row>
@@ -188,197 +138,172 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { getSampleDetail, startSampleAnalysis } from '../api/sample'
 
+const route = useRoute()
 const router = useRouter()
 
-const sample = {
-    sampleId: 'SEQ-20260318-01',
-    patientName: '张**',
-    uploadTime: '2026-03-18 09:30:21',
-    status: 'success',
-    hrdScore: 54,
-    operator: 'Dr. Admin',
-    fileName: 'patient_001.vcf.gz',
-    fileSize: '1.86 GB'
+const loading = ref(false)
+const actionLoading = ref(false)
+const sampleDetail = ref(null)
+
+const sampleId = computed(() => route.params.id)
+
+const fetchSampleDetail = async () => {
+  loading.value = true
+  try {
+    sampleDetail.value = await getSampleDetail(sampleId.value)
+  } catch (error) {
+    console.error('获取样本详情失败:', error)
+    ElMessage.error('获取样本详情失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const result = {
-    loh: 18,
-    tai: 21,
-    lst: 15,
-    summary: '该样本 HRD 综合评分较高，提示存在同源重组修复缺陷倾向，建议结合临床信息与其他检测结果进一步评估。'
+const canStartAnalysis = computed(() => {
+  const status = sampleDetail.value?.status
+  return status === 'uploaded' || status === 'failed'
+})
+
+const handleStartAnalysis = async () => {
+  try {
+    actionLoading.value = true
+    await startSampleAnalysis(sampleId.value)
+    ElMessage.success('分析任务已启动')
+    await fetchSampleDetail()
+  } catch (error) {
+    console.error('启动分析失败:', error)
+    ElMessage.error('启动分析失败')
+  } finally {
+    actionLoading.value = false
+  }
 }
-
-const timeline = [
-    { time: '2026-03-18 09:30:21', content: '样本上传成功，任务已创建', type: 'primary' },
-    { time: '2026-03-18 09:32:10', content: '任务进入 Celery 队列，等待调度', type: 'warning' },
-    { time: '2026-03-18 09:35:48', content: '分析任务开始执行', type: 'primary' },
-    { time: '2026-03-18 09:52:16', content: 'HRD 评分计算完成', type: 'success' },
-    { time: '2026-03-18 09:53:02', content: '结果写入数据库并可供查看', type: 'success' }
-]
-
-const progressPercentage = computed(() => {
-    if (sample.status === 'pending') return 20
-    if (sample.status === 'running') return 65
-    if (sample.status === 'success') return 100
-    if (sample.status === 'error') return 100
-    return 0
-})
-
-const progressStatus = computed(() => {
-    if (sample.status === 'error') return 'exception'
-    if (sample.status === 'success') return 'success'
-    return ''
-})
-
-const progressText = computed(() => {
-    if (sample.status === 'pending') return '20%'
-    if (sample.status === 'running') return '65%'
-    if (sample.status === 'success') return '100%'
-    if (sample.status === 'error') return '失败'
-    return '--'
-})
 
 const goBack = () => {
-    router.push('/sample')
+  router.push('/samples')
 }
 
-const goToResult = () => {
-    router.push(`/results/${sample.sampleId}`)
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  return dateStr.replace('T', ' ').slice(0, 19)
 }
+
+const statusText = (status) => {
+  const map = {
+    uploaded: '已上传',
+    running: '分析中',
+    completed: '已完成',
+    failed: '失败',
+  }
+  return map[status] || status || '-'
+}
+
+const statusTagType = (status) => {
+  const map = {
+    uploaded: 'warning',
+    running: 'primary',
+    completed: 'success',
+    failed: 'danger',
+  }
+  return map[status] || 'info'
+}
+
+const taskTagType = (status) => {
+  const map = {
+    PENDING: 'warning',
+    STARTED: 'primary',
+    SUCCESS: 'success',
+    FAILURE: 'danger',
+    running: 'primary',
+    completed: 'success',
+    failed: 'danger',
+  }
+  return map[status] || 'info'
+}
+
+onMounted(() => {
+  fetchSampleDetail()
+})
 </script>
 
 
 <style scoped>
-.detail-container {
-    padding: 10px;
+.sample-detail-container {
+  padding: 20px;
 }
 
 .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .page-title {
-    margin: 0;
-    font-size: 24px;
-    color: #303133;
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2a44;
 }
 
 .page-subtitle {
-    margin: 6px 0 0;
-    color: #909399;
-    font-size: 14px;
+  margin: 8px 0 0;
+  color: #909399;
+  font-size: 14px;
 }
 
 .header-actions {
-    display: flex;
-    gap: 12px;
+  display: flex;
+  gap: 12px;
 }
 
-.content-row {
-    margin-bottom: 20px;
+.detail-card {
+  margin-bottom: 20px;
+  border-radius: 16px;
 }
 
-.section-card {
-    margin-bottom: 20px;
-    border-radius: 10px;
+.card-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2a44;
 }
 
-.section-header {
-    font-weight: bold;
-    color: #303133;
+.overview-list,
+.result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.info-item {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 20px;
+.overview-item,
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
-.label {
-    font-size: 13px;
-    color: #909399;
-    margin-bottom: 6px;
+.overview-label,
+.result-label {
+  color: #606266;
+  font-size: 14px;
 }
 
-.value {
-    font-size: 15px;
-    color: #303133;
-    font-weight: 500;
+.overview-value,
+.result-value {
+  color: #1f2a44;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
 }
 
-.overview-row {
-    margin-bottom: 20px;
-}
-
-.overview-card {
-    border-radius: 10px;
-    min-height: 160px;
-    /* margin-bottom: 10px; */
-}
-
-.overview-label {
-    font-size: 14px;
-    color: #909399;
-    margin-bottom: 16px;
-}
-
-.overview-value {
-    font-size: 28px;
-    font-weight: bold;
-    color: #303133;
-    margin-bottom: 14px;
-}
-
-.overview-footer {
-    font-size: 13px;
-    color: #909399;
-}
-
-.metric-row {
-    margin-bottom: 20px;
-}
-
-.metric-card {
-    background: #f8f9fb;
-    border-radius: 8px;
-    padding: 18px;
-    text-align: center;
-}
-
-.metric-label {
-    font-size: 13px;
-    color: #909399;
-    margin-bottom: 8px;
-}
-
-.metric-value {
-    font-size: 26px;
-    font-weight: bold;
-    color: #409EFF;
-}
-
-.result-desc {
-    margin-top: 10px;
-}
-
-.action-card {
-    margin-bottom: 0;
-}
-
-.action-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.high-score {
-    color: #F56C6C;
-    font-weight: bold;
+.result-card {
+  min-height: 320px;
 }
 </style>
