@@ -184,3 +184,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 # 时区与 Django 保持一致
 CELERY_TIMEZONE = 'Asia/Shanghai'
+
+HRD_ALLOWED_IMPORT_ROOTS = [
+    "/data_storage2/shiyi/git_repo/work_repo/HRD_system/hrd_data",
+]

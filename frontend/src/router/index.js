@@ -31,6 +31,11 @@ const routes = [
                 name: 'AnalysisResult',
                 component: () => import('../views/AnalysisResult.vue')
             },
+            {
+                path: '/samples/import',
+                name: 'SampleUpload',
+                component: () => import('../views/SampleUpload.vue')
+            },
         ]
     },
     {

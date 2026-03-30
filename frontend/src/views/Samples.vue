@@ -10,12 +10,23 @@
                 <div class="filter-bar">
                     <el-input v-model="searchQuery" placeholder="搜索样本编号或患者编号" style="width: 240px" clearable />
                     <!-- label表示用户在界面上看到的显示文字 value表示每个选项绑定的值 statusFilter则会切换到对应的值 -->
-                    <el-select v-model="statusFilter" placeholder="筛选状态" style="width: 160px;" clearable>
-                        <el-option label="已上传" value="uploaded" />
-                        <el-option label="分析中" value="running" />
-                        <el-option label="已完成" value="completed" />
-                        <el-option label="失败" value="failed" />
+                    <el-select v-model="uploadStatusFilter" placeholder="筛选上传状态" style="width: 160px" clearable>
+                      <el-option label="草稿" value="DRAFT" />
+                      <el-option label="上传中" value="UPLOADING" />
+                      <el-option label="已上传" value="UPLOADED" />
+                      <el-option label="上传失败" value="UPLOAD_FAILED" />
                     </el-select>
+
+                    <el-select v-model="analysisStatusFilter" placeholder="筛选分析状态" style="width: 160px" clearable>
+                      <el-option label="未开始" value="NOT_STARTED" />
+                      <el-option label="排队中" value="QUEUED" />
+                      <el-option label="分析中" value="RUNNING" />
+                      <el-option label="已完成" value="COMPLETED" />
+                      <el-option label="分析失败" value="FAILED" />
+                    </el-select>
+              
+                    <el-button @click="fetchSamples">刷新</el-button>
+                    <el-button type="primary" @click="goToServerImport">服务器导入</el-button>
                 </div>
             </div>
 
@@ -26,19 +37,21 @@
                 <el-table-column prop="patientId" label="患者编号" min-width="160" />
                 <el-table-column prop="sampleCode" label="样本编号" min-width="160" />
 
-                <el-table-column prop="status" label="分析状态" width="120">
-                    <!-- 自定义这一列的单元格显示内容 如果不加插槽 会直接显示status的英文值 -->
-                    <template #default="scope">
-                        <!-- 只有当当前行的status字段值等于等号右边 才会渲染该标签 -->
-                        <!-- '==='是JS的严格相等运算符 不仅值要相等类型也要相同 -->
-                        <el-tag v-if="scope.row.status === 'completed'" type="success" effect="light">已完成</el-tag>
-                        <el-tag v-else-if="scope.row.status === 'running'" type="primary" effect="light">分析中</el-tag>
-                        <el-tag v-else-if="scope.row.status === 'uploaded'" type="warning" effect="light">已上传</el-tag>
-                        <el-tag v-else-if="scope.row.status === 'failed'" type="danger" effect="light">失败</el-tag>
-                        <el-tag v-else effect="light">
-                            {{ scope.row.status }}
-                        </el-tag>
-                    </template>
+                <el-table-column prop="upload_status" label="上传状态" width="140">
+                  <template #default="scope">
+                    <el-tag v-if="scope.row.upload_status === 'UPLOADED'" type="success">已上传</el-tag>
+                    <el-tag v-else-if="scope.row.upload_status === 'UPLOADING'" type="primary">上传中</el-tag>
+                    <el-tag v-else type="info">{{ scope.row.upload_status }}</el-tag>
+                  </template>
+                </el-table-column>
+
+                <el-table-column prop="analysis_status" label="分析状态" width="140">
+                  <template #default="scope">
+                    <el-tag v-if="scope.row.analysis_status === 'COMPLETED'" type="success">已完成</el-tag>
+                    <el-tag v-else-if="scope.row.analysis_status === 'RUNNING'" type="primary">分析中</el-tag>
+                    <el-tag v-else-if="scope.row.analysis_status === 'QUEUED'" type="warning">排队中</el-tag>
+                    <el-tag v-else type="info">{{ scope.row.analysis_status }}</el-tag>
+                  </template>
                 </el-table-column>
 
                 <el-table-column label="HRD评分" width="120">
@@ -81,7 +94,8 @@ import { getSampleList } from '../api/sample'
 const router = useRouter()
 
 const searchQuery = ref('')  // 搜索框
-const statusFilter = ref('')  // 状态筛选框
+const uploadStatusFilter = ref('')
+const analysisStatusFilter = ref('')
 const loading = ref(false)
 const tableData = ref([])
 
@@ -106,10 +120,13 @@ const filteredTableData = computed(() => {
       item.patientId?.toLowerCase().includes(keyword) ||
       item.sampleCode?.toLowerCase().includes(keyword)
 
-    const matchStatus =
-      !statusFilter.value || item.status === statusFilter.value
+    const matchUploadStatus =
+      !uploadStatusFilter.value || item.upload_status === uploadStatusFilter.value
 
-    return matchQuery && matchStatus
+    const matchAnalysisStatus =
+      !analysisStatusFilter.value || item.analysis_status === analysisStatusFilter.value
+
+    return matchQuery && matchUploadStatus && matchAnalysisStatus
   })
 })
 
@@ -120,6 +137,10 @@ const formatDate = (dateStr) => {
 
 const goToDetail = (id) => {
   router.push(`/samples/${id}`)
+}
+
+const goToServerImport = () => {
+  router.push('/samples/import')
 }
 
 onMounted(() => {
@@ -139,7 +160,7 @@ onMounted(() => {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   margin-bottom: 20px;
   flex-wrap: wrap;
@@ -160,6 +181,7 @@ onMounted(() => {
 
 .filter-bar {
   display: flex;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }

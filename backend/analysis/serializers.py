@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Sample, HRDResult, AnalysisTask
+from .models import Sample, HRDResult, AnalysisTask, SampleFile
 
 # 1. 结果序列化器
 class HRDResultSerializer(serializers.ModelSerializer):
@@ -12,18 +12,86 @@ class HRDResultSerializer(serializers.ModelSerializer):
 class AnalysisTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnalysisTask
-        fields = ['id', 'status', 'created_at', 'log_output']
+        fields = ['patient_id', 'sample_code', 'data_type', 'description']
 
 # 3. 样本序列化器 (核心)
 class SampleSerializer(serializers.ModelSerializer):
-    # 嵌套显示：在查询样本时，直接把它的 result (结果) 和 tasks (任务记录) 也带出来
-    result = HRDResultSerializer(read_only=True)
-    
-    # 注意：因为是一对多，tasks 可能会有多个，所以 many=True
-    tasks = AnalysisTaskSerializer(many=True, read_only=True)
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Sample
-        # 暴露所有关键字段，owner 字段我们会自动填充
-        fields = ['id', 'patient_id', 'sample_code', 'status', 'created_at', 'result', 'tasks']
-        read_only_fields = ['id', 'created_at', 'status']
+        fields = [
+            'id',
+            'patient_id',
+            'sample_code',
+            'data_type',
+            'upload_status',
+            'analysis_status',
+            'status',
+            'description',
+            'metadata',
+            'created_at',
+            'updated_at',
+            'owner',
+        ]
+        read_only_fields = [
+            'id',
+            'status',
+            'created_at',
+            'updated_at',
+            'owner',
+        ]
+
+    def get_status(self, obj):
+        """
+        兼容旧前端的状态字段
+        优先返回分析状态；如果分析尚未开始，则返回上传状态
+        """
+        if obj.analysis_status and obj.analysis_status != Sample.AnalysisStatus.NOT_STARTED:
+            return obj.analysis_status
+        return obj.upload_status
+
+
+class SampleFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SampleFile
+        fields = [
+            'id',
+            'file_role',
+            'original_name',
+            'storage_path',
+            'file_size',
+            'upload_status',
+            'merge_status',
+            'is_verified',
+            'metadata',
+            'created_at',
+            'updated_at',
+        ]
+
+
+class SampleDetailSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+    files = SampleFileSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Sample
+        fields = [
+            'id',
+            'patient_id',
+            'sample_code',
+            'data_type',
+            'upload_status',
+            'analysis_status',
+            'status',
+            'description',
+            'metadata',
+            'created_at',
+            'updated_at',
+            'files',
+        ]
+
+    def get_status(self, obj):
+        if obj.analysis_status and obj.analysis_status != Sample.AnalysisStatus.NOT_STARTED:
+            return obj.analysis_status
+        return obj.upload_status
