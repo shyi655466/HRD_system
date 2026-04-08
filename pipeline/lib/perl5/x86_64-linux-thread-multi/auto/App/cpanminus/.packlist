@@ -1,0 +1,6 @@
+/data_storage2/shiyi/hrd_pipeline/bin/cpanm
+/data_storage2/shiyi/hrd_pipeline/lib/perl5/App/cpanminus.pm
+/data_storage2/shiyi/hrd_pipeline/lib/perl5/App/cpanminus/fatscript.pm
+/data_storage2/shiyi/hrd_pipeline/man/man1/cpanm.1
+/data_storage2/shiyi/hrd_pipeline/man/man3/App::cpanminus.3
+/data_storage2/shiyi/hrd_pipeline/man/man3/App::cpanminus::fatscript.3
