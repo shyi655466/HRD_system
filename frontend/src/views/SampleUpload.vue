@@ -36,7 +36,7 @@
               <el-select v-model="sampleForm.data_type" placeholder="请选择数据类型" style="width: 100%">
                 <el-option label="WGS" value="WGS" />
                 <el-option label="WES" value="WES" />
-                <el-option label="SNP Panel" value="SNP_PANEL" />
+                <el-option label="Panel" value="SNP_PANEL" />
               </el-select>
             </el-form-item>
           </el-col>

@@ -30,15 +30,51 @@
                         <el-descriptions-item label="样本编号">
                             {{ sampleDetail.sampleCode || '-' }}
                         </el-descriptions-item>
+                        <el-descriptions-item label="数据类型">
+                            {{ dataTypeLabel(sampleDetail.dataType) }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="备注" :span="2">
+                            {{ sampleDetail.description || '-' }}
+                        </el-descriptions-item>
                         <el-descriptions-item label="创建时间">
                             {{ formatDate(sampleDetail.createdAt) }}
                         </el-descriptions-item>
-                        <el-descriptions-item label="当前状态">
-                            <el-tag :type="statusTagType(sampleDetail.status)" effect="light">
-                                {{ statusText(sampleDetail.status) }}
+                        <el-descriptions-item label="上传状态">
+                            <el-tag :type="uploadStatusTag(sampleDetail.upload_status)" effect="light">
+                                {{ uploadStatusText(sampleDetail.upload_status) }}
+                            </el-tag>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="分析状态">
+                            <el-tag :type="analysisStatusTag(sampleDetail.analysis_status)" effect="light">
+                                {{ analysisStatusText(sampleDetail.analysis_status) }}
                             </el-tag>
                         </el-descriptions-item>
                     </el-descriptions>
+                </el-card>
+
+                <el-card shadow="hover" class="detail-card">
+                    <template #header>
+                        <div class="card-header">关联文件</div>
+                    </template>
+                    <el-table
+                        :data="sampleDetail?.files || []"
+                        stripe
+                        style="width: 100%"
+                        empty-text="暂无文件记录"
+                    >
+                        <el-table-column label="角色" width="120">
+                            <template #default="scope">
+                                {{ fileRoleLabel(scope.row.fileRole) }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="originalName" label="文件名" min-width="140" />
+                        <el-table-column prop="storagePath" label="服务器路径" min-width="280" show-overflow-tooltip />
+                        <el-table-column label="大小" width="100">
+                            <template #default="scope">
+                                {{ formatBytes(scope.row.fileSize) }}
+                            </template>
+                        </el-table-column>
+                    </el-table>
                 </el-card>
 
                 <el-card shadow="hover" class="detail-card">
@@ -51,7 +87,7 @@
                         <el-table-column label="任务状态" width="140">
                             <template #default="scope">
                                 <el-tag :type="taskTagType(scope.row.status)" effect="light">
-                                    {{ scope.row.status }}
+                                    {{ taskStatusText(scope.row.status) }}
                                 </el-tag>
                             </template>
                         </el-table-column>
@@ -60,7 +96,12 @@
                                 {{ formatDate(scope.row.createdAt) }}
                             </template>
                         </el-table-column>
-                        <el-table-column label="日志输出" min-width="240">
+                        <el-table-column label="失败原因" min-width="200" show-overflow-tooltip>
+                            <template #default="scope">
+                                {{ scope.row.errorMessage || '-' }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="日志摘要" min-width="240" show-overflow-tooltip>
                             <template #default="scope">
                                 {{ scope.row.logOutput || '-' }}
                             </template>
@@ -77,11 +118,10 @@
 
                     <div class="overview-list" v-if="sampleDetail">
                         <div class="overview-item">
-                            <span class="overview-label">分析状态
-                                <el-tag :type="statusTagType(sampleDetail.status)" effect="light">
-                                    {{ statusText(sampleDetail.status) }}
-                                </el-tag>
-                            </span>
+                            <span class="overview-label">分析状态</span>
+                            <el-tag :type="analysisStatusTag(sampleDetail.analysis_status)" effect="light">
+                                {{ analysisStatusText(sampleDetail.analysis_status) }}
+                            </el-tag>
                         </div>
 
                         <div class="overview-item">
@@ -92,7 +132,7 @@
                         <div class="overview-item">
                             <span class="overview-label">最近任务</span>
                             <span class="overview-value">
-                                {{ sampleDetail.tasks?.[0]?.status || '-' }}
+                                {{ taskStatusText(sampleDetail.tasks?.[0]?.status) }}
                             </span>
                         </div>
                     </div>
@@ -122,7 +162,7 @@
                         </div>
                         <div class="result-item">
                             <span class="result-label">BRCA状态</span>
-                            <span class="result-value">{{ sampleDetail.result.brcaStatus ?? '-' }}</span>
+                            <span class="result-value">{{ brcaLabel(sampleDetail.result.brcaStatus) }}</span>
                         </div>
                         <div class="result-item">
                             <span class="result-label">分析时间</span>
@@ -165,8 +205,12 @@ const fetchSampleDetail = async () => {
 }
 
 const canStartAnalysis = computed(() => {
-  const status = sampleDetail.value?.status
-  return status === 'uploaded' || status === 'failed'
+  const s = sampleDetail.value
+  if (!s) return false
+  const dataReady = s.upload_status === 'UPLOADED'
+  const analysisOk =
+    s.analysis_status === 'NOT_STARTED' || s.analysis_status === 'FAILED'
+  return dataReady && analysisOk
 })
 
 const handleStartAnalysis = async () => {
@@ -192,35 +236,102 @@ const formatDate = (dateStr) => {
   return dateStr.replace('T', ' ').slice(0, 19)
 }
 
-const statusText = (status) => {
-  const map = {
-    uploaded: '已上传',
-    running: '分析中',
-    completed: '已完成',
-    failed: '失败',
-  }
-  return map[status] || status || '-'
+const dataTypeLabel = (t) => {
+  const map = { WGS: 'WGS', WES: 'WES', SNP_PANEL: 'Panel' }
+  return map[t] || t || '-'
 }
 
-const statusTagType = (status) => {
+const uploadStatusText = (st) => {
   const map = {
-    uploaded: 'warning',
-    running: 'primary',
-    completed: 'success',
-    failed: 'danger',
+    DRAFT: '草稿',
+    UPLOADING: '上传中',
+    UPLOADED: '已上传',
+    UPLOAD_FAILED: '上传失败',
   }
-  return map[status] || 'info'
+  return map[st] || st || '-'
+}
+
+const uploadStatusTag = (st) => {
+  const map = {
+    DRAFT: 'info',
+    UPLOADING: 'primary',
+    UPLOADED: 'success',
+    UPLOAD_FAILED: 'danger',
+  }
+  return map[st] || 'info'
+}
+
+const analysisStatusText = (st) => {
+  const map = {
+    NOT_STARTED: '未开始',
+    QUEUED: '排队中',
+    RUNNING: '分析中',
+    COMPLETED: '已完成',
+    FAILED: '分析失败',
+  }
+  return map[st] || st || '-'
+}
+
+const analysisStatusTag = (st) => {
+  const map = {
+    NOT_STARTED: 'info',
+    QUEUED: 'warning',
+    RUNNING: 'primary',
+    COMPLETED: 'success',
+    FAILED: 'danger',
+  }
+  return map[st] || 'info'
+}
+
+const fileRoleLabel = (role) => {
+  const map = {
+    TUMOR_R1: '肿瘤 R1',
+    TUMOR_R2: '肿瘤 R2',
+    NORMAL_R1: '对照 R1',
+    NORMAL_R2: '对照 R2',
+  }
+  return map[role] || role || '-'
+}
+
+const formatBytes = (n) => {
+  if (n == null || n === '') return '-'
+  const v = Number(n)
+  if (Number.isNaN(v)) return '-'
+  if (v < 1024) return `${v} B`
+  if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`
+  return `${(v / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const brcaLabel = (raw) => {
+  const map = {
+    UNKNOWN: '未知',
+    POSITIVE: '阳性',
+    NEGATIVE: '阴性',
+    VUS: 'VUS',
+  }
+  return map[raw] || raw || '-'
+}
+
+const taskStatusText = (st) => {
+  const map = {
+    PENDING: '待执行',
+    QUEUED: '排队中',
+    RUNNING: '运行中',
+    SUCCESS: '成功',
+    FAILED: '失败',
+    CANCELLED: '已取消',
+  }
+  return map[st] || st || '-'
 }
 
 const taskTagType = (status) => {
   const map = {
     PENDING: 'warning',
-    STARTED: 'primary',
+    QUEUED: 'warning',
+    RUNNING: 'primary',
     SUCCESS: 'success',
-    FAILURE: 'danger',
-    running: 'primary',
-    completed: 'success',
-    failed: 'danger',
+    FAILED: 'danger',
+    CANCELLED: 'info',
   }
   return map[status] || 'info'
 }
@@ -232,7 +343,7 @@ onMounted(() => {
 
 
 <style scoped>
-.sample-detail-container {
+.detail-container {
   padding: 20px;
 }
 

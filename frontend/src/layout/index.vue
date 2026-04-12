@@ -57,14 +57,12 @@ import { DataLine, Files } from '@element-plus/icons-vue'
 // 从 vue-router 中导入 useRouter 方法
 // 用于在组合式 API 中获取路由对象
 import { useRouter } from 'vue-router'
+import { removeToken } from '../utils/auth'
 
-// 调用 useRouter() 获取路由实例
-// router 可以用来做页面跳转, 如push等
 const router = useRouter()
 
-// 定义退出登录函数
-// 点击 “退出系统” 按钮后跳转到 /login 登录页
 const logout = () => {
+    removeToken()
     router.push('/login')
 }
 </script>

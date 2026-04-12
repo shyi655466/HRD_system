@@ -33,9 +33,14 @@
             <!-- 表格组件 展示样本记录列表 -->
             <!-- :data 表示表格数据源 传入的是JS表达式 -->
             <!-- v-loading 是指令 表示当 loading 为真时 在这个元素表面挂一个加载遮罩层 -->
-            <el-table :data="filteredTableData" style="width: 100%" stripe v-loading="loading">
+            <el-table :data="tableData" style="width: 100%" stripe v-loading="loading">
                 <el-table-column prop="patientId" label="患者编号" min-width="160" />
                 <el-table-column prop="sampleCode" label="样本编号" min-width="160" />
+                <el-table-column label="数据类型" width="100">
+                  <template #default="scope">
+                    {{ dataTypeLabel(scope.row.dataType) }}
+                  </template>
+                </el-table-column>
 
                 <el-table-column prop="upload_status" label="上传状态" width="140">
                   <template #default="scope">
@@ -62,13 +67,13 @@
 
                  <el-table-column label="BRCA状态" width="140">
                     <template #default="scope">
-                        {{ scope.row.result?.brcaStatus ?? '-' }}
+                        {{ brcaLabel(scope.row.result?.brcaStatus) }}
                     </template>
                 </el-table-column>
                 
                  <el-table-column label="创建时间" width="180">
                     <template #default="scope">
-                        {{ formatDate(scope.row.createAt) }}
+                        {{ formatDate(scope.row.createdAt) }}
                     </template>
                 </el-table-column>
 
@@ -80,20 +85,20 @@
                 </el-table-column>                                                                                           
             </el-table>
 
-            <el-empty v-if="!loading && filteredTableData.length === 0" description="暂无样本数据" />
+            <el-empty v-if="!loading && tableData.length === 0" description="暂无样本数据" />
         </el-card>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { getSampleList } from '../api/sample'
 
 const router = useRouter()
 
-const searchQuery = ref('')  // 搜索框
+const searchQuery = ref('')
 const uploadStatusFilter = ref('')
 const analysisStatusFilter = ref('')
 const loading = ref(false)
@@ -102,7 +107,12 @@ const tableData = ref([])
 const fetchSamples = async () => {
   loading.value = true
   try {
-    tableData.value = await getSampleList()
+    const params = {}
+    const q = searchQuery.value.trim()
+    if (q) params.q = q
+    if (uploadStatusFilter.value) params.upload_status = uploadStatusFilter.value
+    if (analysisStatusFilter.value) params.analysis_status = analysisStatusFilter.value
+    tableData.value = await getSampleList(params)
   } catch (error) {
     console.error('获取样本列表失败:', error)
     ElMessage.error('获取样本列表失败')
@@ -111,28 +121,34 @@ const fetchSamples = async () => {
   }
 }
 
-const filteredTableData = computed(() => {
-  const keyword = searchQuery.value.trim().toLowerCase()
-
-  return tableData.value.filter((item) => {
-    const matchQuery =
-      !keyword ||
-      item.patientId?.toLowerCase().includes(keyword) ||
-      item.sampleCode?.toLowerCase().includes(keyword)
-
-    const matchUploadStatus =
-      !uploadStatusFilter.value || item.upload_status === uploadStatusFilter.value
-
-    const matchAnalysisStatus =
-      !analysisStatusFilter.value || item.analysis_status === analysisStatusFilter.value
-
-    return matchQuery && matchUploadStatus && matchAnalysisStatus
-  })
+let searchDebounce = null
+watch(searchQuery, () => {
+  clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => fetchSamples(), 400)
+})
+watch([uploadStatusFilter, analysisStatusFilter], () => {
+  fetchSamples()
 })
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '-'
   return dateStr.replace('T', ' ').slice(0, 19)
+}
+
+const dataTypeLabel = (t) => {
+  const map = { WGS: 'WGS', WES: 'WES', SNP_PANEL: 'Panel' }
+  return map[t] || t || '-'
+}
+
+const brcaLabel = (raw) => {
+  if (raw == null || raw === '') return '-'
+  const map = {
+    UNKNOWN: '未知',
+    POSITIVE: '阳性',
+    NEGATIVE: '阴性',
+    VUS: 'VUS',
+  }
+  return map[raw] || raw
 }
 
 const goToDetail = (id) => {

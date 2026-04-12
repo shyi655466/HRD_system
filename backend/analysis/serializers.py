@@ -5,18 +5,37 @@ from .models import Sample, HRDResult, AnalysisTask, SampleFile
 class HRDResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = HRDResult
-        # 我们只暴露核心的科学指标给前端
-        fields = ['hrd_score', 'loh_score', 'tai_score', 'lst_score', 'brca_status', 'variant_data', 'analysis_date']
+        fields = [
+            "hrd_score",
+            "loh_score",
+            "tai_score",
+            "lst_score",
+            "brca_status",
+            "variant_data",
+            "analysis_date",
+        ]
 
-# 2. 任务序列化器
+
+# 2. 任务序列化器（与 AnalysisTask 模型字段一致）
 class AnalysisTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnalysisTask
-        fields = ['patient_id', 'sample_code', 'data_type', 'description']
+        fields = [
+            "id",
+            "task_type",
+            "status",
+            "celery_task_id",
+            "log_output",
+            "error_message",
+            "created_at",
+            "started_at",
+            "finished_at",
+        ]
 
 # 3. 样本序列化器 (核心)
 class SampleSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
+    result = HRDResultSerializer(source="hrd_result", read_only=True, allow_null=True)
 
     class Meta:
         model = Sample
@@ -33,6 +52,7 @@ class SampleSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'owner',
+            'result',
         ]
         read_only_fields = [
             'id',
@@ -73,6 +93,8 @@ class SampleFileSerializer(serializers.ModelSerializer):
 class SampleDetailSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     files = SampleFileSerializer(many=True, read_only=True)
+    result = HRDResultSerializer(source="hrd_result", read_only=True, allow_null=True)
+    tasks = AnalysisTaskSerializer(many=True, read_only=True, source="analysis_tasks")
 
     class Meta:
         model = Sample
@@ -89,6 +111,8 @@ class SampleDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
             'files',
+            'result',
+            'tasks',
         ]
 
     def get_status(self, obj):

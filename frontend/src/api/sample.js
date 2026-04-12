@@ -1,8 +1,8 @@
 import request from '../utils/request'
 import { adaptSample, adaptSampleList } from './adapters/sample'
 
-export async function getSampleList() {
-  const res = await request.get('/api/samples/')
+export async function getSampleList(params = {}) {
+  const res = await request.get('/api/samples/', { params })
   return adaptSampleList(res)
 }
 
