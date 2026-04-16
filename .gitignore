@@ -21,4 +21,8 @@ result/
 alleleCount-4.2.1/
 tools/
 
-pipeline/ref/ASCAT/
+pipeline/ref/
+
+# pipeline 运行输出目录（保留 work/.gitkeep 作为占位）
+pipeline/work/*
+!pipeline/work/.gitkeep

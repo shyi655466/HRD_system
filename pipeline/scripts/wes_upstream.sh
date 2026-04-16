@@ -2,13 +2,12 @@
 set -euo pipefail
 
 # ================= 配置区域 =================
-FASTP_CMD="fastp"
-BWA_CMD="bwa"
-SAMTOOLS_CMD="samtools"
-SEQUENZA_UTILS_CMD="sequenza-utils"
-
-JAVA_CMD="java"
-PICARD_JAR="/data/software/picard/build/libs/picard.jar"
+FASTP_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/fastp"
+BWA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/bwa"
+SAMTOOLS_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/samtools"
+SEQUENZA_UTILS_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/sequenza-utils"
+JAVA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/java"
+PICARD_JAR="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/share/picard-3.4.0-0/picard.jar"
 
 THREADS=8
 REF_FA="/data/database/hg38/hg38.fa"
@@ -56,6 +55,26 @@ check_cmd() {
     }
 }
 
+check_file() {
+    local f="$1"
+    [[ -f "$f" ]] || { echo "Error: 文件不存在: $f" >&2; exit 1; }
+}
+
+has_bam_index() {
+    local bam="$1"
+    local idx1="${bam}.bai"
+    local idx2="${bam%.bam}.bai"
+    [[ -f "${idx1}" || -f "${idx2}" ]]
+}
+
+check_bam_index() {
+    local bam="$1"
+    if ! has_bam_index "${bam}"; then
+        echo "Error: 未找到 BAM 索引（支持 .bai/.bam.bai）: ${bam}" >&2
+        exit 1
+    fi
+}
+
 detect_fastq_pair() {
     local prefix="$1"
 
@@ -90,6 +109,12 @@ build_dedup_bam() {
     log "  RG_SM: ${rg_sm}"
     log "  RG_LB: ${rg_lb}"
 
+    # 已有 dedup BAM 则跳过上游，便于失败后重跑
+    if [[ -f "${dedup_bam}" ]] && has_bam_index "${dedup_bam}"; then
+        log "[${prefix}] 检测到已有 dedup BAM，跳过 fastp/bwa/picard"
+        return 0
+    fi
+
     # 1. fastp
     log "[${prefix}] Step 1/3 fastp 质控"
     "${FASTP_CMD}" \
@@ -115,7 +140,7 @@ build_dedup_bam() {
 
     # 基本检查
     [[ -f "${dedup_bam}" ]] || { echo "Error: ${dedup_bam} 未生成" >&2; exit 1; }
-    [[ -f "${dedup_bam}.bai" ]] || { echo "Error: ${dedup_bam}.bai 未生成" >&2; exit 1; }
+    check_bam_index "${dedup_bam}"
 
     # 清理中间文件
     log "[${prefix}] 清理中间文件"
@@ -174,7 +199,7 @@ run_sequenza() {
 }
 
 # ================ 参数解析 ================
-while getopts "T:N:a:b:c:d:t:r:g:o:h" opt; do
+while getopts "T:N:a:b:c:d:t:r:g:o:w:h" opt; do
     case "${opt}" in
         T) TUMOR_PREFIX="${OPTARG}" ;;
         N) NORMAL_PREFIX="${OPTARG}" ;;
@@ -186,6 +211,7 @@ while getopts "T:N:a:b:c:d:t:r:g:o:h" opt; do
         r) REF_FA="${OPTARG}" ;;
         g) GC_WIG="${OPTARG}" ;;
         o) OUT_PREFIX="${OPTARG}" ;;
+        w) BIN_WIDTH="${OPTARG}" ;;
         h) usage ;;
         *) usage ;;
     esac
@@ -227,6 +253,9 @@ ensure_gc_wig
 
 run_sequenza "${NORMAL_PREFIX}.dedup.bam" "${TUMOR_PREFIX}.dedup.bam" "${OUT_PREFIX}"
 
+check_file "${OUT_PREFIX}.seqz.gz"
+check_file "${OUT_PREFIX}_small.seqz.gz"
+
 log "=========================================="
 log "流程全部结束"
 log "最终关键输出:"
@@ -235,3 +264,6 @@ log "  ${TUMOR_PREFIX}.dedup.bam"
 log "  ${OUT_PREFIX}.seqz.gz"
 log "  ${OUT_PREFIX}_small.seqz.gz"
 log "=========================================="
+
+echo "WES_PIPELINE_SEQZ=${OUT_PREFIX}.seqz.gz"
+echo "WES_PIPELINE_SEQZ_SMALL=${OUT_PREFIX}_small.seqz.gz"
