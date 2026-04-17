@@ -3,12 +3,21 @@ from .views import (
     SampleListCreateView,
     SampleDetailView,
     StartAnalysisView,
+    DashboardStatsView,
+    HRDPositiveScoreConfigView,
     ServerPathValidateView,
     ServerFileBrowseView,
     ImportSampleFromServerView,
 )
 
 urlpatterns = [
+    path("dashboard/stats/", DashboardStatsView.as_view(), name="dashboard-stats"),
+    path(
+        "config/hrd-threshold/",
+        HRDPositiveScoreConfigView.as_view(),
+        name="hrd-threshold-config",
+    ),
+
     # 样本基础接口
     # 对应 /api/samples/ -> 列出所有 或 新建
     path('samples/', SampleListCreateView.as_view(), name='sample-list-create'),

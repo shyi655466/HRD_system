@@ -1,29 +1,47 @@
 # analysis/tasks.py
-import time
 import traceback
 from celery import shared_task
 from django.db import transaction
 from django.utils import timezone
 
+from utils.logger import logger
+
+from .hrd_pipeline import run_wgs_for_sample
 from .models import Sample, AnalysisTask, HRDResult
 
 
 @shared_task
 def run_hrd_analysis(db_task_id, sample_id):
     """
-    异步 HRD 分析：仅在此任务内调用命令行/R 脚本并写库（V1 为模拟耗时与结果）。
+    异步 HRD 分析：初版仅 WGS，调用 pipeline/scripts/run_wgs.sh 并解析 TSV 写库。
     """
     task = None
     sample = None
     try:
         task = AnalysisTask.objects.select_related("sample").get(id=db_task_id)
-        sample = Sample.objects.get(id=sample_id)
-    except (AnalysisTask.DoesNotExist, Sample.DoesNotExist) as e:
+    except AnalysisTask.DoesNotExist as e:
         return f"SKIP: {e}"
+
+    if str(task.sample_id) != str(sample_id):
+        logger.error(
+            "run_hrd_analysis 参数与任务记录不一致: db_task_id=%s task.sample_id=%s sample_id=%s",
+            db_task_id,
+            task.sample_id,
+            sample_id,
+        )
+        return "SKIP: sample_id mismatch"
+
+    sample = task.sample
 
     err_tail = ""
 
     try:
+        if sample.data_type != Sample.DataType.WGS:
+            raise ValueError(
+                "初版仅支持 WGS。当前样本数据类型为 "
+                f"{sample.get_data_type_display()}，请待后续版本。"
+            )
+
         task.status = AnalysisTask.Status.RUNNING
         task.started_at = timezone.now()
         task.save(update_fields=["status", "started_at", "updated_at"])
@@ -31,37 +49,37 @@ def run_hrd_analysis(db_task_id, sample_id):
         sample.analysis_status = Sample.AnalysisStatus.RUNNING
         sample.save(update_fields=["analysis_status", "updated_at"])
 
-        # ====== 未来：在此调用生信命令行 / R 脚本 ======
-        print(f"任务 [{task.id}] 开始处理样本: {sample.sample_code}")
-        time.sleep(15)
-
-        mock_result_data = {
-            "hrd_score": 68.5,
-            "loh_score": 25,
-            "tai_score": 25,
-            "lst_score": 18,
-            "brca_status": HRDResult.BRCAStatus.NEGATIVE,
-        }
-        # ===============================================
+        print(f"任务 [{task.id}] 开始 WGS 流程: {sample.sample_code}")
+        result_data, pipe_log, result_tsv = run_wgs_for_sample(
+            sample, analysis_task_id=task.id
+        )
+        log_tail = (pipe_log or "")[-12000:]
 
         with transaction.atomic():
             HRDResult.objects.update_or_create(
                 sample=sample,
                 defaults={
-                    **mock_result_data,
+                    "hrd_score": result_data["hrd_score"],
+                    "loh_score": result_data["loh_score"],
+                    "tai_score": result_data["tai_score"],
+                    "lst_score": result_data["lst_score"],
+                    "brca_status": result_data["brca_status"],
                     "input_type": sample.data_type,
+                    "pipeline_version": "wgs_v1_celery",
                     "analysis_date": timezone.now(),
                 },
             )
 
             task.status = AnalysisTask.Status.SUCCESS
             task.finished_at = timezone.now()
-            task.log_output = "Analysis completed successfully."
+            task.result_path = result_tsv
+            task.log_output = log_tail
             task.error_message = ""
             task.save(
                 update_fields=[
                     "status",
                     "finished_at",
+                    "result_path",
                     "log_output",
                     "error_message",
                     "updated_at",

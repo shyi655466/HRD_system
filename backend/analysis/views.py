@@ -84,6 +84,17 @@ class StartAnalysisView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if sample.data_type != Sample.DataType.WGS:
+            return Response(
+                {
+                    "detail": (
+                        "初版仅支持 WGS 分析。当前样本数据类型为 "
+                        f"{sample.get_data_type_display()}，请新建 WGS 样本或待后续版本。"
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if sample.analysis_status not in (
             Sample.AnalysisStatus.NOT_STARTED,
             Sample.AnalysisStatus.FAILED,
@@ -118,6 +129,85 @@ class StartAnalysisView(APIView):
                 "analysis_status": sample.analysis_status,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class DashboardStatsView(APIView):
+    """
+    仪表盘汇总：当前登录用户的样本数、分析/任务状态分布、最近分析任务（真实数据）。
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.core.exceptions import ObjectDoesNotExist
+        from django.db.models import Count
+
+        user = request.user
+        sample_qs = Sample.objects.filter(owner=user)
+        total_samples = sample_qs.count()
+
+        analysis_status_counts = dict(
+            sample_qs.values("analysis_status")
+            .annotate(c=Count("id"))
+            .values_list("analysis_status", "c")
+        )
+
+        task_qs = AnalysisTask.objects.filter(sample__owner=user)
+        task_status_counts = dict(
+            task_qs.values("status").annotate(c=Count("id")).values_list("status", "c")
+        )
+
+        recent_tasks_qs = (
+            task_qs.select_related("sample", "sample__hrd_result")
+            .order_by("-created_at")[:15]
+        )
+        recent_tasks = []
+        for t in recent_tasks_qs:
+            s = t.sample
+            hrd_score = None
+            try:
+                hrd_score = float(s.hrd_result.hrd_score)
+            except ObjectDoesNotExist:
+                pass
+            recent_tasks.append(
+                {
+                    "task_id": t.id,
+                    "sample_id": str(s.id),
+                    "sample_code": s.sample_code,
+                    "patient_id": s.patient_id,
+                    "task_status": t.status,
+                    "sample_analysis_status": s.analysis_status,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                    "hrd_score": hrd_score,
+                }
+            )
+
+        return Response(
+            {
+                "total_samples": total_samples,
+                "analysis_status_counts": analysis_status_counts,
+                "task_status_counts": task_status_counts,
+                "recent_tasks": recent_tasks,
+            }
+        )
+
+
+class HRDPositiveScoreConfigView(APIView):
+    """
+    HRD 阳性判定阈值（与 settings.HRD_POSITIVE_SCORE_MIN 一致），供前端统一展示与判定。
+    规则：HRD 总分 >= hrd_positive_score_min 为阳性。
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        threshold = float(getattr(settings, "HRD_POSITIVE_SCORE_MIN", 42.0))
+        return Response(
+            {
+                "hrd_positive_score_min": threshold,
+                "positive_rule": "HRD 总分大于等于该值判定为阳性",
+            }
         )
 
 

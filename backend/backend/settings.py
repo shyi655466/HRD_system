@@ -10,7 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,13 +22,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-!wm7r085jyw0^wp^^=p#ric8*l+f^o5v)8oyxty*#+5$s)plpz'
+# 生产环境：必须设置环境变量 DJANGO_SECRET_KEY；勿将真实密钥写入仓库。
+# 本地未设置时使用仅用于开发的占位密钥；关闭 DEBUG 时禁止使用占位密钥。
+_DEV_PLACEHOLDER_SECRET = "django-insecure-dev-only-not-for-production"
+SECRET_KEY = (os.environ.get("DJANGO_SECRET_KEY") or "").strip()
+if not SECRET_KEY:
+    SECRET_KEY = _DEV_PLACEHOLDER_SECRET
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() in ("1", "true", "yes")
 
-ALLOWED_HOSTS = []
+if not DEBUG and SECRET_KEY == _DEV_PLACEHOLDER_SECRET:
+    raise ImproperlyConfigured(
+        "生产环境必须设置环境变量 DJANGO_SECRET_KEY，且不能使用开发占位密钥。"
+    )
+
+_hosts_raw = (os.environ.get("DJANGO_ALLOWED_HOSTS") or "127.0.0.1,localhost").strip()
+ALLOWED_HOSTS = [h.strip() for h in _hosts_raw.split(",") if h.strip()]
 
 
 # Application definition
@@ -88,31 +100,23 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# 凭据通过环境变量提供，参见仓库根目录 .env.example
+
+if "MYSQL_UNIX_SOCKET" in os.environ:
+    _mysql_sock = os.environ["MYSQL_UNIX_SOCKET"].strip()
+    _db_options = {"unix_socket": _mysql_sock} if _mysql_sock else {}
+else:
+    _db_options = {"unix_socket": "/data_storage2/shiyi/mysql_data/mysql.sock"}
 
 DATABASES = {
-    'default': {
-        # 1. 指定使用 MySQL 引擎
-        'ENGINE': 'django.db.backends.mysql',
-        
-        # 2. 数据库名字 (刚才你用 SQL 创建的那个)
-        'NAME': 'hrd_db',
-        
-        # 3. 用户名 (初始化时默认是 root)
-        'USER': 'root',
-        
-        # 4. 密码 (因为用了 --initialize-insecure，所以这里留空)
-        'PASSWORD': '',
-        
-        # 5. 主机地址 (强制使用 TCP 协议)
-        'HOST': '127.0.0.1',
-        
-        # 6. 端口号
-        'PORT': '33061',
-        
-        # 7. 关键选项：指定 Socket 文件路径
-        'OPTIONS': {
-            'unix_socket': '/data_storage2/shiyi/mysql_data/mysql.sock',
-        },
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.environ.get("MYSQL_DATABASE", "hrd_db"),
+        "USER": os.environ.get("MYSQL_USER", "root"),
+        "PASSWORD": os.environ.get("MYSQL_PASSWORD", ""),
+        "HOST": os.environ.get("MYSQL_HOST", "127.0.0.1"),
+        "PORT": os.environ.get("MYSQL_PORT", "33061"),
+        "OPTIONS": _db_options,
     }
 }
 
@@ -173,11 +177,11 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',), 
 }
 
-# 配置 Celery 
-# 消息代理 (Broker) 是本地的 Redis，端口 6379，数据库 0
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
-# 结果也存回 Redis (数据库 1)
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/1'
+# 配置 Celery（可用 CELERY_BROKER_URL / CELERY_RESULT_BACKEND 覆盖）
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get(
+    "CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1"
+)
 # 接受的内容格式
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -186,5 +190,35 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Asia/Shanghai'
 
 HRD_ALLOWED_IMPORT_ROOTS = [
-    "/data_storage2/shiyi/git_repo/work_repo/HRD_system/hrd_data",
+    "/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test",
 ]
+
+# 生信 pipeline（相对仓库根目录，可用环境变量覆盖）
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+HRD_PIPELINE_ROOT = Path(os.environ.get("HRD_PIPELINE_ROOT", _REPO_ROOT / "pipeline"))
+HRD_PIPELINE_WORK_ROOT = Path(
+    os.environ.get("HRD_PIPELINE_WORK_ROOT", _REPO_ROOT / "pipeline" / "work")
+)
+# 传给 run_wgs.sh -r；留空则使用脚本内默认参考路径
+HRD_WGS_REF_FA = os.environ.get("HRD_WGS_REF_FA", "")
+HRD_WGS_THREADS = os.environ.get("HRD_WGS_THREADS", "8")
+# 可选：显式指定 Rscript（否则 run_wgs.sh 使用 pipeline/envs/bin/Rscript）
+HRD_RSCRIPT = os.environ.get("HRD_RSCRIPT", "")
+# WGS 子进程超时（秒）；缺省或 <=0 表示不限制
+_hrd_to = os.environ.get("HRD_WGS_SUBPROCESS_TIMEOUT", "").strip()
+if _hrd_to:
+    _hrd_tov = int(_hrd_to)
+    HRD_WGS_SUBPROCESS_TIMEOUT = _hrd_tov if _hrd_tov > 0 else None
+else:
+    HRD_WGS_SUBPROCESS_TIMEOUT = None
+
+# HRD 阳性判定：总分 >= 该值视为阳性（与前端展示一致；可用环境变量 HRD_POSITIVE_SCORE_MIN 覆盖）
+_hrd_pos = os.environ.get("HRD_POSITIVE_SCORE_MIN", "").strip()
+if _hrd_pos:
+    try:
+        _hrd_pos_v = float(_hrd_pos)
+        HRD_POSITIVE_SCORE_MIN = _hrd_pos_v if _hrd_pos_v > 0 else 42.0
+    except ValueError:
+        HRD_POSITIVE_SCORE_MIN = 42.0
+else:
+    HRD_POSITIVE_SCORE_MIN = 42.0

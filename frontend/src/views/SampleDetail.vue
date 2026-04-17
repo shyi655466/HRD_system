@@ -6,9 +6,19 @@
             <div>
                 <h2 class="page-title">样本详情</h2>
                 <p class="page-subtitle">查看样本基础信息、分析进度与 HRD 结果摘要</p>
+                <p v-if="shouldPollAnalysis" class="poll-hint">
+                  分析排队或进行中，每 {{ pollIntervalSec }} 秒自动更新状态
+                </p>
             </div>
             <div class="header-actions">
                 <el-button @click="goBack">返回列表</el-button>
+                <el-button
+                  v-if="sampleDetail?.result"
+                  type="success"
+                  @click="goToResult"
+                >
+                  查看结果报告
+                </el-button>
                 <el-button type="primary" :disabled="!canStartAnalysis" :loading="actionLoading" @click="handleStartAnalysis">开始分析</el-button>
             </div>
         </div>
@@ -178,10 +188,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getSampleDetail, startSampleAnalysis } from '../api/sample'
+
+const POLL_MS = 8000
+const pollIntervalSec = POLL_MS / 1000
 
 const route = useRoute()
 const router = useRouter()
@@ -189,18 +202,52 @@ const router = useRouter()
 const loading = ref(false)
 const actionLoading = ref(false)
 const sampleDetail = ref(null)
+let pollTimer = null
 
 const sampleId = computed(() => route.params.id)
 
-const fetchSampleDetail = async () => {
-  loading.value = true
+const shouldPollAnalysis = computed(() => {
+  const st = sampleDetail.value?.analysis_status
+  return st === 'QUEUED' || st === 'RUNNING'
+})
+
+const stopDetailPolling = () => {
+  if (pollTimer != null) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+const startDetailPolling = () => {
+  stopDetailPolling()
+  pollTimer = window.setInterval(async () => {
+    if (!shouldPollAnalysis.value) {
+      stopDetailPolling()
+      return
+    }
+    await fetchSampleDetail({ silent: true })
+  }, POLL_MS)
+}
+
+watch(
+  shouldPollAnalysis,
+  (need) => {
+    if (need) startDetailPolling()
+    else stopDetailPolling()
+  },
+  { flush: 'post' }
+)
+
+const fetchSampleDetail = async (opts = {}) => {
+  const silent = opts.silent === true
+  if (!silent) loading.value = true
   try {
     sampleDetail.value = await getSampleDetail(sampleId.value)
   } catch (error) {
     console.error('获取样本详情失败:', error)
-    ElMessage.error('获取样本详情失败')
+    if (!silent) ElMessage.error('获取样本详情失败')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -229,6 +276,10 @@ const handleStartAnalysis = async () => {
 
 const goBack = () => {
   router.push('/samples')
+}
+
+const goToResult = () => {
+  if (sampleId.value) router.push(`/results/${sampleId.value}`)
 }
 
 const formatDate = (dateStr) => {
@@ -339,6 +390,10 @@ const taskTagType = (status) => {
 onMounted(() => {
   fetchSampleDetail()
 })
+
+onUnmounted(() => {
+  stopDetailPolling()
+})
 </script>
 
 
@@ -367,6 +422,12 @@ onMounted(() => {
   margin: 8px 0 0;
   color: #909399;
   font-size: 14px;
+}
+
+.poll-hint {
+  margin: 6px 0 0;
+  color: #a8abb2;
+  font-size: 13px;
 }
 
 .header-actions {

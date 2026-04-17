@@ -105,6 +105,12 @@ process_sample() {
 
     local FQ1="${PREFIX}_1.fastq"
     local FQ2="${PREFIX}_2.fastq"
+    if [[ ! -f "${FQ1}" ]]; then
+        FQ1="${PREFIX}_1.fastq.gz"
+    fi
+    if [[ ! -f "${FQ2}" ]]; then
+        FQ2="${PREFIX}_2.fastq.gz"
+    fi
 
     local CLEAN1="${PREFIX}.clean_1.fastq.gz"
     local CLEAN2="${PREFIX}.clean_2.fastq.gz"

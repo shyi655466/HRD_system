@@ -1,28 +1,24 @@
 # 忽略 Python 缓存
 __pycache__/
+
+# 忽略日志文件
 *.log
+*.logs
 
 # 忽略环境
 envs/
 env/
+.env
 
 # 忽略 VSCode 配置
 .vscode/
 
 # 忽略 Redis 数据库
 dump.rdb
+backend/dump.rdb
 
 # 忽略测试数据和原始数据
 test/
-data/
-result/
 
-# 忽略 alleleCount 工具
-alleleCount-4.2.1/
-tools/
-
+pipeline/work/
 pipeline/ref/
-
-# pipeline 运行输出目录（保留 work/.gitkeep 作为占位）
-pipeline/work/*
-!pipeline/work/.gitkeep

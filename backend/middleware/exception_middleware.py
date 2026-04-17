@@ -25,13 +25,12 @@ class GlobalExceptionMiddleware:
         logger.error(f"错误详情: {str(exception)}")
         logger.error(traceback.format_exc()) # 打印完整的追踪信息，方便找Bug
 
-        # 2. 拦截错误，不向前端暴露系统的物理路径和 500 黄页，而是返回我们定义的标准 JSON 格式
-        # 这里的格式必须和前端约定好
+        # 2. 不向客户端泄露异常详情（路径、SQL 等）；详情仅写入日志
         response_data = {
-            "code": 5000, # 我们可以定义 5000 代表系统内部错误
+            "code": 5000,
             "status": "error",
-            "message": f"系统运行异常，请联系管理员或查看日志。错误摘要: {str(exception)}",
-            "data": None
+            "message": "系统运行异常，请联系管理员或查看服务器日志。",
+            "data": None,
         }
         
         # 返回 200 状态码但包含错误 code，或者直接返回 500 状态码，取决于你的前端 axios 怎么配置

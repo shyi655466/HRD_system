@@ -41,6 +41,10 @@ class Sample(TimeStampedModel):
     metadata = models.JSONField(default=dict, blank=True)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="samples")
 
+    class Meta:
+        verbose_name = "样本"
+        verbose_name_plural = "样本"
+
 class SampleFile(TimeStampedModel):
     class FileRole(models.TextChoices):
         TUMOR_R1 = "TUMOR_R1", "Tumor FASTQ R1"
@@ -77,6 +81,10 @@ class SampleFile(TimeStampedModel):
     merge_status = models.CharField(max_length=20, choices=MergeStatus.choices, default=MergeStatus.PENDING)
     is_verified = models.BooleanField(default=False)
     metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "样本文件"
+        verbose_name_plural = "样本文件"
 
 class UploadSession(TimeStampedModel):
     """

@@ -77,10 +77,16 @@
                     </template>
                 </el-table-column>
 
-                <el-table-column label="操作" min-width="140" fixed="right">
+                <el-table-column label="操作" min-width="220" fixed="right">
                     <template #default="scope">
-                        <!-- type表示按钮风格样式 link表示按钮为链接样式-->
                         <el-button type="primary" link @click="goToDetail(scope.row.id)">查看详情</el-button>
+                        <el-button v-if="scope.row.analysis_status === 'COMPLETED' && scope.row.result"
+                          type="success"
+                          link
+                          @click="goToResult(scope.row.id)"
+                        >
+                          查看结果
+                        </el-button>
                     </template>
                 </el-table-column>                                                                                           
             </el-table>
@@ -153,6 +159,10 @@ const brcaLabel = (raw) => {
 
 const goToDetail = (id) => {
   router.push(`/samples/${id}`)
+}
+
+const goToResult = (id) => {
+  router.push(`/results/${id}`)
 }
 
 const goToServerImport = () => {
