@@ -12,13 +12,21 @@
             </div>
             <div class="header-actions">
                 <el-button @click="goBack">返回列表</el-button>
-                <el-button
-                  v-if="sampleDetail?.result"
-                  type="success"
-                  @click="goToResult"
+                <el-tooltip
+                  :disabled="!!sampleDetail?.result"
+                  content="暂无 HRD 结果：请先完成分析且成功生成结果"
+                  placement="bottom"
                 >
-                  查看结果报告
-                </el-button>
+                  <span class="header-btn-wrap">
+                    <el-button
+                      type="success"
+                      :disabled="!sampleDetail?.result"
+                      @click="goToReport"
+                    >
+                      查看报告
+                    </el-button>
+                  </span>
+                </el-tooltip>
                 <el-button type="primary" :disabled="!canStartAnalysis" :loading="actionLoading" @click="handleStartAnalysis">开始分析</el-button>
             </div>
         </div>
@@ -93,27 +101,35 @@
                     </template>
 
                     <el-table :data="sampleDetail?.tasks || []" stripe style="width: 100%" empty-text="暂无分析记录">
-                        <el-table-column prop="id" label="任务ID" width="100" />
-                        <el-table-column label="任务状态" width="140">
+                        <el-table-column prop="id" label="任务ID" width="72" align="center" />
+                        <el-table-column label="任务状态" width="96">
                             <template #default="scope">
                                 <el-tag :type="taskTagType(scope.row.status)" effect="light">
                                     {{ taskStatusText(scope.row.status) }}
                                 </el-tag>
                             </template>
                         </el-table-column>
-                        <el-table-column label="创建时间" min-width="180">
+                        <el-table-column label="创建时间" width="170">
                             <template #default="scope">
                                 {{ formatDate(scope.row.createdAt) }}
                             </template>
                         </el-table-column>
-                        <el-table-column label="失败原因" min-width="200" show-overflow-tooltip>
+                        <el-table-column label="失败原因" min-width="360">
                             <template #default="scope">
-                                {{ scope.row.errorMessage || '-' }}
+                                <div
+                                  v-if="scope.row.errorMessage"
+                                  class="task-log-text task-log-text--error"
+                                >{{ scope.row.errorMessage }}</div>
+                                <span v-else class="task-log-empty">-</span>
                             </template>
                         </el-table-column>
-                        <el-table-column label="日志摘要" min-width="240" show-overflow-tooltip>
+                        <el-table-column label="日志摘要" min-width="440">
                             <template #default="scope">
-                                {{ scope.row.logOutput || '-' }}
+                                <div
+                                  v-if="scope.row.logOutput"
+                                  class="task-log-text"
+                                >{{ scope.row.logOutput }}</div>
+                                <span v-else class="task-log-empty">-</span>
                             </template>
                         </el-table-column>
                     </el-table>
@@ -278,8 +294,8 @@ const goBack = () => {
   router.push('/samples')
 }
 
-const goToResult = () => {
-  if (sampleId.value) router.push(`/results/${sampleId.value}`)
+const goToReport = () => {
+  if (sampleId.value) router.push(`/samples/${sampleId.value}/report`)
 }
 
 const formatDate = (dateStr) => {
@@ -433,6 +449,12 @@ onUnmounted(() => {
 .header-actions {
   display: flex;
   gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.header-btn-wrap {
+  display: inline-block;
 }
 
 .detail-card {
@@ -477,5 +499,33 @@ onUnmounted(() => {
 
 .result-card {
   min-height: 320px;
+}
+
+/* 与终端一致保留换行与空格 */
+.task-log-text {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #303133;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+}
+
+.task-log-text--error {
+  background: #fef0f0;
+  border-color: #fde2e2;
+  color: #c45656;
+}
+
+.task-log-empty {
+  color: #909399;
 }
 </style>

@@ -35,6 +35,16 @@ def pipeline_work_root() -> Path:
     return _repo_root() / "pipeline" / "work"
 
 
+def sample_hrd_result_dir(sample: Sample) -> Path:
+    """
+    与 WGS 流程一致的分析输出目录：pipeline/work/<sample_uuid>/hrd_result/
+    若目录不存在则创建（便于异步报告任务在独立事务中写入）。
+    """
+    d = pipeline_work_root() / str(sample.id) / "hrd_result"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def sanitize_pair_id(sample: Sample) -> str:
     raw = (sample.sample_code or "").strip() or str(sample.id)
     s = re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("._-")
@@ -137,6 +147,17 @@ def parse_final_hrd_tsv(tsv_path: Path) -> dict[str, Any]:
     }
 
 
+def brca_status_from_hrd_score(hrd_score: float) -> str:
+    """
+    BRCA 状态字段当前与 HRD 总分判定一致（与 settings.HRD_POSITIVE_SCORE_MIN 及前端阈值对齐）：
+    HRD 总分 >= 阈值为阳性，否则为阴性。
+    """
+    thr = float(getattr(settings, "HRD_POSITIVE_SCORE_MIN", 42.0))
+    if hrd_score >= thr:
+        return HRDResult.BRCAStatus.POSITIVE
+    return HRDResult.BRCAStatus.NEGATIVE
+
+
 def run_wgs_for_sample(
     sample: Sample,
     *,
@@ -149,8 +170,8 @@ def run_wgs_for_sample(
     paths = collect_fastq_by_role(sample)
     work_dir, normal_prefix, tumor_prefix = prepare_wgs_workdir(sample, paths)
     pair_id = sanitize_pair_id(sample)
-    hrd_out = work_dir / "hrd_out"
-    hrd_out.mkdir(parents=True, exist_ok=True)
+    hrd_result_dir = work_dir / "hrd_result"
+    hrd_result_dir.mkdir(parents=True, exist_ok=True)
 
     run_sh = pipeline_scripts_dir() / "run_wgs.sh"
     if not run_sh.is_file():
@@ -179,7 +200,7 @@ def run_wgs_for_sample(
         "-b",
         f"{sample.sample_code}_tumor_lb",
         "-o",
-        str(hrd_out.resolve()),
+        str(hrd_result_dir.resolve()),
     ]
     threads = getattr(settings, "HRD_WGS_THREADS", None)
     if threads:
@@ -231,7 +252,7 @@ def run_wgs_for_sample(
         _, _, rest = result_line.partition("=")
         tsv_str = rest.strip() or None
     if not tsv_str:
-        cand = hrd_out / f"{pair_id}_final_hrd_score.tsv"
+        cand = hrd_result_dir / f"{pair_id}_final_hrd_score.tsv"
         if cand.is_file():
             tsv_str = str(cand.resolve())
     if not tsv_str:
@@ -242,5 +263,5 @@ def run_wgs_for_sample(
         raise FileNotFoundError(f"HRD 结果文件不存在: {tsv_path}")
 
     scores = parse_final_hrd_tsv(tsv_path)
-    scores["brca_status"] = HRDResult.BRCAStatus.UNKNOWN
+    scores["brca_status"] = brca_status_from_hrd_score(scores["hrd_score"])
     return scores, log, str(tsv_path.resolve())

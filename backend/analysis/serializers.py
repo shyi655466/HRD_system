@@ -1,8 +1,16 @@
+from django.conf import settings
 from rest_framework import serializers
 from .models import Sample, HRDResult, AnalysisTask, SampleFile
 
 # 1. 结果序列化器
 class HRDResultSerializer(serializers.ModelSerializer):
+    """
+    brca_status 对外与 HRD 总分判定一致：>= HRD_POSITIVE_SCORE_MIN 为阳性，否则阴性
+    （与管道写入规则一致；历史 UNKNOWN 亦按 hrd_score 推导展示）。
+    """
+
+    brca_status = serializers.SerializerMethodField()
+
     class Meta:
         model = HRDResult
         fields = [
@@ -11,9 +19,24 @@ class HRDResultSerializer(serializers.ModelSerializer):
             "tai_score",
             "lst_score",
             "brca_status",
+            "input_type",
+            "genome_build",
+            "pipeline_version",
             "variant_data",
+            "qc_metrics",
+            "report_path",
             "analysis_date",
         ]
+
+    def get_brca_status(self, obj: HRDResult) -> str:
+        thr = float(getattr(settings, "HRD_POSITIVE_SCORE_MIN", 42.0))
+        try:
+            score = float(obj.hrd_score)
+        except (TypeError, ValueError):
+            return HRDResult.BRCAStatus.UNKNOWN
+        if score >= thr:
+            return HRDResult.BRCAStatus.POSITIVE
+        return HRDResult.BRCAStatus.NEGATIVE
 
 
 # 2. 任务序列化器（与 AnalysisTask 模型字段一致）
@@ -25,6 +48,7 @@ class AnalysisTaskSerializer(serializers.ModelSerializer):
             "task_type",
             "status",
             "celery_task_id",
+            "result_path",
             "log_output",
             "error_message",
             "created_at",

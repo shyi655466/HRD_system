@@ -6,8 +6,9 @@ from django.utils import timezone
 
 from utils.logger import logger
 
-from .hrd_pipeline import run_wgs_for_sample
+from .hrd_pipeline import run_wgs_for_sample, sample_hrd_result_dir
 from .models import Sample, AnalysisTask, HRDResult
+from .report_html import build_hrd_report_html
 
 
 @shared_task
@@ -89,6 +90,9 @@ def run_hrd_analysis(db_task_id, sample_id):
             sample.analysis_status = Sample.AnalysisStatus.COMPLETED
             sample.save(update_fields=["analysis_status", "updated_at"])
 
+            sid = str(sample.id)
+            transaction.on_commit(lambda s=sid: generate_hrd_report_task.delay(s))
+
         print(f"任务 [{task.id}] 完成，结果已入库。")
         return "SUCCESS"
 
@@ -112,4 +116,90 @@ def run_hrd_analysis(db_task_id, sample_id):
             sample.analysis_status = Sample.AnalysisStatus.FAILED
             sample.save(update_fields=["analysis_status", "updated_at"])
         print(f"任务 [{getattr(task, 'id', '?')}] 失败: {e}")
+        return "FAILED"
+
+
+REPORT_FILENAME = "HRD_report.html"
+
+
+@shared_task(bind=True, name="analysis.generate_hrd_report_task")
+def generate_hrd_report_task(self, sample_id: str):
+    """
+    HRD 分析成功后异步生成静态 HTML 报告，写入 pipeline/work/<UUID>/hrd_result/HRD_report.html，
+    并更新 HRDResult.report_path；同时写入一条 REPORT_GENERATE 类型的 AnalysisTask 记录。
+    """
+    celery_id = ""
+    try:
+        rid = getattr(self.request, "id", None)
+        celery_id = str(rid) if rid is not None else ""
+    except Exception:
+        celery_id = ""
+
+    db_task = None
+    try:
+        sample = Sample.objects.select_related("hrd_result").get(pk=sample_id)
+    except Sample.DoesNotExist:
+        logger.error("generate_hrd_report_task: 样本不存在 sample_id=%s", sample_id)
+        return "SKIP: sample not found"
+
+    result = getattr(sample, "hrd_result", None)
+    if result is None:
+        logger.warning("generate_hrd_report_task: 无 HRD 结果，跳过 sample_id=%s", sample_id)
+        return "SKIP: no hrd_result"
+
+    db_task = AnalysisTask.objects.create(
+        sample=sample,
+        task_type=AnalysisTask.TaskType.REPORT_GENERATE,
+        status=AnalysisTask.Status.RUNNING,
+        started_at=timezone.now(),
+        celery_task_id=celery_id,
+        parameters={"output": REPORT_FILENAME},
+    )
+
+    log_lines: list[str] = []
+    try:
+        hrd_result_dir = sample_hrd_result_dir(sample)
+        out_path = hrd_result_dir / REPORT_FILENAME
+        html_doc = build_hrd_report_html(sample, result)
+        out_path.write_text(html_doc, encoding="utf-8")
+        abs_path = str(out_path.resolve())
+        log_lines.append(f"written: {abs_path}")
+
+        HRDResult.objects.filter(pk=result.pk).update(report_path=abs_path)
+
+        db_task.status = AnalysisTask.Status.SUCCESS
+        db_task.finished_at = timezone.now()
+        db_task.result_path = abs_path
+        db_task.log_output = "\n".join(log_lines)
+        db_task.error_message = ""
+        db_task.save(
+            update_fields=[
+                "status",
+                "finished_at",
+                "result_path",
+                "log_output",
+                "error_message",
+                "updated_at",
+            ]
+        )
+        logger.info("HRD 报告已生成 sample_id=%s path=%s", sample_id, abs_path)
+        return "SUCCESS"
+
+    except Exception as e:
+        err = traceback.format_exc()[-4000:]
+        logger.exception("generate_hrd_report_task 失败 sample_id=%s", sample_id)
+        if db_task:
+            db_task.status = AnalysisTask.Status.FAILED
+            db_task.finished_at = timezone.now()
+            db_task.error_message = str(e)[:2000]
+            db_task.log_output = "\n".join(log_lines) + "\n" + err
+            db_task.save(
+                update_fields=[
+                    "status",
+                    "finished_at",
+                    "error_message",
+                    "log_output",
+                    "updated_at",
+                ]
+            )
         return "FAILED"

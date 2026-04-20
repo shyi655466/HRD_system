@@ -18,7 +18,7 @@
 # 示例:
 #   Rscript pipeline/scripts/wgs_downstream.R \
 #       pipeline/test/SAMN29155871/SRR19859026.dedup.bam pipeline/test/SAMN29155871/SRR19859027.dedup.bam \
-#       SAMN29155871 pipeline/test/SAMN29155871/HRD_result \
+#       SAMN29155871 pipeline/test/SAMN29155871/hrd_result \
 #       pipeline/envs/bin/alleleCounter \
 #       pipeline/ref/ASCAT/hg38/G1000_alleles_hg38_chr \
 #       pipeline/ref/ASCAT/hg38/G1000_loci_hg38_chr \

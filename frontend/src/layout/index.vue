@@ -8,21 +8,22 @@
                 router 表示启用 vue-router 路由模式
                 点击菜单项时，会根据 index 自动跳转到对应路由
             -->
-            <el-menu default-active="/" router class="el-menu-vertical">
-                <!-- 第一个菜单项 点击后跳转到根路径 / -->
+            <el-menu
+                :default-active="menuActive"
+                router
+                class="el-menu-vertical"
+            >
                 <el-menu-item index="/">
-                    <!--
-                        el-icon 是 Element Plus 提供的图标容器组件
-                        外层 el-icon 负责图标显示容器
-                        内层 DataLine 负责具体画出图标
-                    -->
                     <el-icon><DataLine /></el-icon>
                     <span>工作台概览</span>
                 </el-menu-item>
-                <!-- 第二个菜单项 点击后跳转到 /samples -->
                 <el-menu-item index="/samples">
                     <el-icon><Files /></el-icon>
                     <span>临床样本管理</span>
+                </el-menu-item>
+                <el-menu-item index="/reports">
+                    <el-icon><Document /></el-icon>
+                    <span>查看报告</span>
                 </el-menu-item>
             </el-menu>
         </el-aside>
@@ -52,14 +53,23 @@
 <script setup>
 // 从 @element-plus/icons-vue 中导入两个图标组件
 // DataLine：数据分析类图标 Files：文件类图标
-import { DataLine, Files } from '@element-plus/icons-vue'
+import { DataLine, Files, Document } from '@element-plus/icons-vue'
 
-// 从 vue-router 中导入 useRouter 方法
-// 用于在组合式 API 中获取路由对象
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { removeToken } from '../utils/auth'
 
 const router = useRouter()
+const route = useRoute()
+
+const menuActive = computed(() => {
+  const p = route.path
+  if (p === '/reports' || p.startsWith('/reports/')) return '/reports'
+  if (/\/samples\/[^/]+\/report/.test(p)) return '/reports'
+  if (p.startsWith('/samples')) return '/samples'
+  if (p === '/' || p === '') return '/'
+  return p
+})
 
 const logout = () => {
     removeToken()

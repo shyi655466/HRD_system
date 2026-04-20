@@ -8,9 +8,9 @@ set -euo pipefail
 #   bash pipeline/scripts/run_wgs.sh \
 #     -n <normal_prefix> -t <tumor_prefix> -p <pair_id> \
 #     -N <normal_sm> -T <tumor_sm> -a <normal_lb> -b <tumor_lb> \
-#     [-@ <threads>] [-r <ref_fa>] [-o <hrd_out_dir>]
+#     [-@ <threads>] [-r <ref_fa>] [-o <hrd_result_dir>]
 #
-# 未指定 -o 时，HRD 目录默认为: $(dirname <tumor.dedup.bam>)/HRD_result
+# 未指定 -o 时，HRD 目录默认为: $(dirname <tumor.dedup.bam>)/hrd_result
 #
 # 环境变量（可选）:
 #   RSCRIPT  — Rscript 可执行文件，默认 pipeline/envs/bin/Rscript
@@ -28,7 +28,7 @@ usage() {
 Usage:
   $0 -n <normal_prefix> -t <tumor_prefix> -p <pair_id> \\
      -N <normal_sm> -T <tumor_sm> -a <normal_lb> -b <tumor_lb> \\
-     [-@ <threads>] [-r <ref_fa>] [-o <hrd_out_dir>]
+     [-@ <threads>] [-r <ref_fa>] [-o <hrd_result_dir>]
 
   -h  显示帮助
 
@@ -54,8 +54,8 @@ run_downstream() {
   local tumor_bam="$1"
   local normal_bam="$2"
   local sample_id="$3"
-  local hrd_out="$4"
-  local final_tsv="${hrd_out}/${sample_id}_final_hrd_score.tsv"
+  local hrd_result_dir="$4"
+  local final_tsv="${hrd_result_dir}/${sample_id}_final_hrd_score.tsv"
 
   if [[ -f "${final_tsv}" ]]; then
     echo "[Skip] 已有 HRD 结果，跳过 wgs_downstream.R: ${final_tsv}"
@@ -66,20 +66,20 @@ run_downstream() {
   [[ -f "${DOWNSTREAM_R}" ]] || { echo "Error: 未找到 ${DOWNSTREAM_R}" >&2; exit 1; }
   [[ -x "${RSCRIPT_CMD}" || -f "${RSCRIPT_CMD}" ]] || { echo "Error: Rscript 不可用: ${RSCRIPT_CMD}" >&2; exit 1; }
 
-  mkdir -p "${hrd_out}"
+  mkdir -p "${hrd_result_dir}"
   echo "=========================================="
   echo "WGS downstream (wgs_downstream.R)"
   echo "Sample   : ${sample_id}"
   echo "Tumor BAM: ${tumor_bam}"
   echo "Normal   : ${normal_bam}"
-  echo "HRD out  : ${hrd_out}"
+  echo "HRD dir  : ${hrd_result_dir}"
   echo "=========================================="
 
   "${RSCRIPT_CMD}" "${DOWNSTREAM_R}" \
     "${tumor_bam}" \
     "${normal_bam}" \
     "${sample_id}" \
-    "${hrd_out}"
+    "${hrd_result_dir}"
 
   [[ -f "${final_tsv}" ]] || { echo "Error: 未生成 ${final_tsv}" >&2; exit 1; }
   echo "HRD_PIPELINE_RESULT_TSV=${final_tsv}"
@@ -150,7 +150,7 @@ TUMOR_BAM="$(abs_path "${TUMOR_BAM}")"
 NORMAL_BAM="$(abs_path "${NORMAL_BAM}")"
 
 if [[ -z "${HRD_OUT}" ]]; then
-  HRD_OUT="$(dirname "${TUMOR_BAM}")/HRD_result"
+  HRD_OUT="$(dirname "${TUMOR_BAM}")/hrd_result"
 else
   mkdir -p "${HRD_OUT}"
   HRD_OUT="$(abs_path "${HRD_OUT}")"

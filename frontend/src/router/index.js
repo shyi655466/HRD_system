@@ -19,17 +19,20 @@ const routes = [
                 name: 'Samples',
                 component: () => import('../views/Samples.vue')
             },
-            // 样本编号
+            {
+                path: '/reports',
+                name: 'ReportHub',
+                component: () => import('../views/ReportHub.vue'),
+            },
+            {
+                path: '/samples/:id/report',
+                name: 'SampleReport',
+                component: () => import('../views/HrdReport.vue'),
+            },
             {
                 path: '/samples/:id',
                 name: 'SampleDetail',
                 component: () => import('../views/SampleDetail.vue')
-            },
-            // 查看完整报告
-            {
-                path: '/results/:id',
-                name: 'AnalysisResult',
-                component: () => import('../views/AnalysisResult.vue')
             },
             {
                 path: '/samples/import',

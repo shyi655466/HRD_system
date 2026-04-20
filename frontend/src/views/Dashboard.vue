@@ -141,6 +141,7 @@
           <div class="quick-actions">
             <el-button type="primary" @click="goImport">服务器导入样本</el-button>
             <el-button @click="goSamples">样本列表</el-button>
+            <el-button type="success" plain @click="goReports">查看报告</el-button>
           </div>
         </el-card>
       </el-col>
@@ -152,7 +153,7 @@
             </div>
           </template>
           <ul class="notice-list">
-            <li>初版：WGS 全流程分析（服务器路径导入 FASTQ）；结果页支持 JSON/CSV 导出。</li>
+            <li>初版：WGS 全流程分析（服务器路径导入 FASTQ）；统一报告页支持 JSON/CSV 导出与打印。</li>
             <li>非 WGS 样本可录入，但「开始分析」将提示仅支持 WGS。</li>
             <li>大文件浏览器分片上传、PDF 报告等未在本版本实现。</li>
           </ul>
@@ -239,6 +240,7 @@ const formatTime = (iso) => {
 
 const goSamples = () => router.push('/samples')
 const goImport = () => router.push('/samples/import')
+const goReports = () => router.push('/reports')
 
 const onTaskRowClick = (row) => {
   if (row?.sample_id) router.push(`/samples/${row.sample_id}`)

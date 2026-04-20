@@ -40,7 +40,7 @@ pick_bam_sources() {
   if [[ -f "${new_tumor}" && -f "${new_normal}" ]] && has_bam_index "${new_tumor}" && has_bam_index "${new_normal}"; then
     TUMOR_BAM="${new_tumor}"
     NORMAL_BAM="${new_normal}"
-    [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${RUN_ROOT}/${PAIR_ID}/hrd_out"
+    [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${RUN_ROOT}/${PAIR_ID}/hrd_result"
     return 0
   fi
 

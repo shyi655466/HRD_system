@@ -15,7 +15,7 @@
 #   Rscript pipeline/scripts/wes_downstream.R \
 #     pipeline/test/pair1/pair1_small.seqz.gz \
 #     pair1 \
-#     pipeline/test/pair1/HRD_result \
+#     pipeline/test/pair1/hrd_result \
 #     grch38
 # ==============================================================================
 

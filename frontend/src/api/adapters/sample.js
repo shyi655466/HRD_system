@@ -6,6 +6,7 @@ export function adaptTask(task) {
     taskType: task.task_type,
     status: task.status,
     celeryTaskId: task.celery_task_id,
+    resultPath: task.result_path || '',
     createdAt: task.created_at,
     startedAt: task.started_at,
     finishedAt: task.finished_at,
@@ -23,7 +24,12 @@ export function adaptResult(result) {
     taiScore: result.tai_score,
     lstScore: result.lst_score,
     brcaStatus: result.brca_status,
+    inputType: result.input_type,
+    genomeBuild: result.genome_build,
+    pipelineVersion: result.pipeline_version,
     variantData: result.variant_data,
+    qcMetrics: result.qc_metrics,
+    reportPath: result.report_path || '',
     analysisDate: result.analysis_date,
   }
 }

@@ -8,7 +8,7 @@ __pycache__/
 # 忽略环境
 envs/
 env/
-.env
+.env.example
 
 # 忽略 VSCode 配置
 .vscode/
