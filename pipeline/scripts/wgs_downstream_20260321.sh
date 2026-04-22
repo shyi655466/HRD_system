@@ -7,19 +7,28 @@ set -euo pipefail
 #
 # 用法:
 #   bash pipeline/scripts/wgs_downstream_20260321.sh [pair_id] [run_root] [reuse_dir] [output_dir]
+#
+# 可选环境变量: HRD_PIPELINE_ROOT, HRD_WGS_DOWNSTREAM_R, HRD_WGS_ALLELECOUNTER_EXE,
+#   HRD_WGS_ASCAT_*（与 wgs_downstream.R 一致）, HRD_WGS_DEFAULT_SINGLE_RUN_ROOT, HRD_WGS_DEFAULT_REUSE_PARENT
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_DEFAULT_PIPELINE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PIPELINE_ROOT="${HRD_PIPELINE_ROOT:-${_DEFAULT_PIPELINE_ROOT}}"
+_PAIR_DEFAULT_RUN="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321/wgs_run_20260321"
+_PAIR_DEFAULT_REUSE_PARENT="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321"
 
 PAIR_ID="${1:-P13}"
-RUN_ROOT="${2:-/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321/wgs_run_20260321}"
+RUN_ROOT="${2:-${HRD_WGS_DEFAULT_SINGLE_RUN_ROOT:-${_PAIR_DEFAULT_RUN}}}"
 PAIR_ID_LOWER="$(echo "${PAIR_ID}" | tr '[:upper:]' '[:lower:]')"
-REUSE_DIR="${3:-/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321/${PAIR_ID_LOWER}}"
+REUSE_DIR="${3:-${HRD_WGS_DEFAULT_REUSE_PARENT:-${_PAIR_DEFAULT_REUSE_PARENT}}/${PAIR_ID_LOWER}}"
 OUTPUT_DIR="${4:-}"
 
-WGS_DOWNSTREAM_R="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/scripts/wgs_downstream.R"
-ALLELECOUNTER_EXE="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/alleleCounter"
-ALLELES_PREFIX="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/ref/ASCAT/hg38/G1000_alleles_hg38_chr/G1000_alleles_hg38_chr"
-LOCI_PREFIX="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/ref/ASCAT/hg38/G1000_loci_hg38_chr_prefixed/G1000_loci_hg38_chr"
-GC_FILE="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/ref/ASCAT/hg38/GC_G1000_hg38.txt"
-RT_FILE="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/ref/ASCAT/hg38/RT_G1000_hg38.txt"
+WGS_DOWNSTREAM_R="${HRD_WGS_DOWNSTREAM_R:-${SCRIPT_DIR}/wgs_downstream.R}"
+ALLELECOUNTER_EXE="${HRD_WGS_ALLELECOUNTER_EXE:-${PIPELINE_ROOT}/envs/bin/alleleCounter}"
+ALLELES_PREFIX="${HRD_WGS_ASCAT_ALLELES_PREFIX:-${PIPELINE_ROOT}/ref/ASCAT/hg38/G1000_alleles_hg38_chr/G1000_alleles_hg38_chr}"
+LOCI_PREFIX="${HRD_WGS_ASCAT_LOCI_PREFIX:-${PIPELINE_ROOT}/ref/ASCAT/hg38/G1000_loci_hg38_chr_prefixed/G1000_loci_hg38_chr}"
+GC_FILE="${HRD_WGS_ASCAT_GC_FILE:-${PIPELINE_ROOT}/ref/ASCAT/hg38/GC_G1000_hg38.txt}"
+RT_FILE="${HRD_WGS_ASCAT_RT_FILE:-${PIPELINE_ROOT}/ref/ASCAT/hg38/RT_G1000_hg38.txt}"
 
 check_file() {
   local f="$1"
@@ -40,7 +49,7 @@ pick_bam_sources() {
   if [[ -f "${new_tumor}" && -f "${new_normal}" ]] && has_bam_index "${new_tumor}" && has_bam_index "${new_normal}"; then
     TUMOR_BAM="${new_tumor}"
     NORMAL_BAM="${new_normal}"
-    [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${RUN_ROOT}/${PAIR_ID}/hrd_result"
+    [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${RUN_ROOT}/${PAIR_ID}/HRD_result"
     return 0
   fi
 

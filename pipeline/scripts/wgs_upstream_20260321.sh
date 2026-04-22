@@ -9,25 +9,37 @@ set -euo pipefail
 #     [pair_id] [tumor_r1] [tumor_r2] [normal_r1] [normal_r2] [run_root] [threads] [reuse_dir]
 #
 # 当能在 reuse_dir 找到 <pair_id小写>.tumor/normal.dedup.bam 时，不要求 FASTQ 参数
+#
+# 可选环境变量: HRD_PIPELINE_ROOT, HRD_WGS_REF_FA, HRD_WGS_FASTP/BWA/SAMTOOLS/JAVA/PICARD_JAR,
+#   HRD_WGS_THREADS, FASTP_TIMEOUT_SEC,
+#   HRD_WGS_DEFAULT_SINGLE_RUN_ROOT（第 6 参数默认 run_root）,
+#   HRD_WGS_DEFAULT_REUSE_PARENT（第 8 参数默认目录 = 该路径/<pair_id 小写>）
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_DEFAULT_PIPELINE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PIPELINE_ROOT="${HRD_PIPELINE_ROOT:-${_DEFAULT_PIPELINE_ROOT}}"
+
+_PAIR_DEFAULT_RUN="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321/wgs_run_20260321"
+_PAIR_DEFAULT_REUSE_PARENT="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321"
 
 PAIR_ID="${1:-P13}"
 TUMOR_R1="${2:-}"
 TUMOR_R2="${3:-}"
 NORMAL_R1="${4:-}"
 NORMAL_R2="${5:-}"
-RUN_ROOT="${6:-/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321/wgs_run_20260321}"
-THREADS="${7:-8}"
+RUN_ROOT="${6:-${HRD_WGS_DEFAULT_SINGLE_RUN_ROOT:-${_PAIR_DEFAULT_RUN}}}"
+THREADS="${7:-${HRD_WGS_THREADS:-8}}"
 PAIR_ID_LOWER="$(echo "${PAIR_ID}" | tr '[:upper:]' '[:lower:]')"
-REUSE_DIR="${8:-/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test/20260321/${PAIR_ID_LOWER}}"
+REUSE_DIR="${8:-${HRD_WGS_DEFAULT_REUSE_PARENT:-${_PAIR_DEFAULT_REUSE_PARENT}}/${PAIR_ID_LOWER}}"
 FASTP_TIMEOUT_SEC="${FASTP_TIMEOUT_SEC:-14400}"
 
-REF_FA="/data/database/hg38/hg38.fa"
-FASTP_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/fastp"
-BWA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/bwa"
-SAMTOOLS_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/samtools"
-JAVA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/java"
-PICARD_JAR="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/share/picard-3.4.0-0/picard.jar"
-RG_PL="ILLUMINA"
+REF_FA="${HRD_WGS_REF_FA:-/data/database/hg38/hg38.fa}"
+FASTP_CMD="${HRD_WGS_FASTP:-${PIPELINE_ROOT}/envs/bin/fastp}"
+BWA_CMD="${HRD_WGS_BWA:-${PIPELINE_ROOT}/envs/bin/bwa}"
+SAMTOOLS_CMD="${HRD_WGS_SAMTOOLS:-${PIPELINE_ROOT}/envs/bin/samtools}"
+JAVA_CMD="${HRD_WGS_JAVA:-${PIPELINE_ROOT}/envs/bin/java}"
+PICARD_JAR="${HRD_WGS_PICARD_JAR:-${PIPELINE_ROOT}/envs/share/picard-3.4.0-0/picard.jar}"
+RG_PL="${HRD_WGS_RG_PL:-ILLUMINA}"
 
 check_file() {
   local f="$1"
