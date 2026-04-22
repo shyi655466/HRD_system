@@ -1,0 +1,10 @@
+.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+frontend
+node_modules
+**/.env
+backend/logs
+*.log
+pipeline/work

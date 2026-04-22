@@ -1,5 +1,6 @@
 """
-WGS HRD 流程编排：准备工作目录、调用 run_wgs.sh、解析 *_final_hrd_score.tsv。
+HRD 流程编排：WGS / WES 共用 work 目录布局，分别调用 run_wgs.sh、run_wes.sh，
+解析 *_final_hrd_score.tsv；输出目录 HRD_result/ 与 run.log 约定一致。
 """
 from __future__ import annotations
 
@@ -37,10 +38,10 @@ def pipeline_work_root() -> Path:
 
 def sample_hrd_result_dir(sample: Sample) -> Path:
     """
-    与 WGS 流程一致的分析输出目录：pipeline/work/<sample_uuid>/hrd_result/
+    与 WGS/WES 流程一致的分析输出目录：pipeline/work/<sample_uuid>/HRD_result/
     若目录不存在则创建（便于异步报告任务在独立事务中写入）。
     """
-    d = pipeline_work_root() / str(sample.id) / "hrd_result"
+    d = pipeline_work_root() / str(sample.id) / "HRD_result"
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -147,6 +148,33 @@ def parse_final_hrd_tsv(tsv_path: Path) -> dict[str, Any]:
     }
 
 
+def resolve_hrd_result_tsv_path(
+    log: str,
+    hrd_result_dir: Path,
+    pair_id: str,
+) -> Path:
+    """从 run.log 中 HRD_PIPELINE_RESULT_TSV= 行或默认路径解析最终 TSV。"""
+    result_line = None
+    for line in log.splitlines():
+        if line.startswith("HRD_PIPELINE_RESULT_TSV="):
+            result_line = line.strip()
+            break
+    tsv_str: str | None = None
+    if result_line:
+        _, _, rest = result_line.partition("=")
+        tsv_str = rest.strip() or None
+    if not tsv_str:
+        cand = hrd_result_dir / f"{pair_id}_final_hrd_score.tsv"
+        if cand.is_file():
+            tsv_str = str(cand.resolve())
+    if not tsv_str:
+        raise RuntimeError(f"未能解析 HRD 结果 TSV 路径。日志尾部:\n{log[-4000:]}")
+    tsv_path = Path(tsv_str)
+    if not tsv_path.is_file():
+        raise FileNotFoundError(f"HRD 结果文件不存在: {tsv_path}")
+    return tsv_path
+
+
 def brca_status_from_hrd_score(hrd_score: float) -> str:
     """
     BRCA 状态字段当前与 HRD 总分判定一致（与 settings.HRD_POSITIVE_SCORE_MIN 及前端阈值对齐）：
@@ -170,7 +198,7 @@ def run_wgs_for_sample(
     paths = collect_fastq_by_role(sample)
     work_dir, normal_prefix, tumor_prefix = prepare_wgs_workdir(sample, paths)
     pair_id = sanitize_pair_id(sample)
-    hrd_result_dir = work_dir / "hrd_result"
+    hrd_result_dir = work_dir / "HRD_result"
     hrd_result_dir.mkdir(parents=True, exist_ok=True)
 
     run_sh = pipeline_scripts_dir() / "run_wgs.sh"
@@ -178,6 +206,7 @@ def run_wgs_for_sample(
         raise FileNotFoundError(f"未找到 run_wgs.sh: {run_sh}")
 
     env = os.environ.copy()
+    env["HRD_APPEND_LOG"] = "1"
     rscript = getattr(settings, "HRD_RSCRIPT", None)
     if rscript:
         env["RSCRIPT"] = rscript
@@ -221,20 +250,17 @@ def run_wgs_for_sample(
         logf.write(f"log_file: {log_path.resolve()}\n")
         logf.write("--- command ---\n")
         logf.write(cmd_line + "\n")
-        logf.write("--- pipeline output ---\n")
+        logf.write("--- pipeline output (run_wgs.sh 经 tee 追加) ---\n")
         logf.flush()
 
-        run_kw: dict = dict(
-            cwd=str(pipeline_scripts_dir().parent),
-            env=env,
-            stdout=logf,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        _timeout = getattr(settings, "HRD_WGS_SUBPROCESS_TIMEOUT", None)
-        if _timeout and _timeout > 0:
-            run_kw["timeout"] = _timeout
-        proc = subprocess.run(cmd, **run_kw)
+    run_kw: dict = dict(
+        cwd=str(pipeline_scripts_dir().parent),
+        env=env,
+    )
+    _timeout = getattr(settings, "HRD_WGS_SUBPROCESS_TIMEOUT", None)
+    if _timeout and _timeout > 0:
+        run_kw["timeout"] = _timeout
+    proc = subprocess.run(cmd, **run_kw)
 
     log = log_path.read_text(encoding="utf-8")
     if proc.returncode != 0:
@@ -242,26 +268,98 @@ def run_wgs_for_sample(
             f"run_wgs.sh 退出码 {proc.returncode}，完整日志: {log_path}\n{log[-8000:]}"
         )
 
-    result_line = None
-    for line in log.splitlines():
-        if line.startswith("HRD_PIPELINE_RESULT_TSV="):
-            result_line = line.strip()
-            break
-    tsv_str: str | None = None
-    if result_line:
-        _, _, rest = result_line.partition("=")
-        tsv_str = rest.strip() or None
-    if not tsv_str:
-        cand = hrd_result_dir / f"{pair_id}_final_hrd_score.tsv"
-        if cand.is_file():
-            tsv_str = str(cand.resolve())
-    if not tsv_str:
-        raise RuntimeError(f"未能解析 HRD 结果 TSV 路径。日志尾部:\n{log[-4000:]}")
+    tsv_path = resolve_hrd_result_tsv_path(log, hrd_result_dir, pair_id)
+    scores = parse_final_hrd_tsv(tsv_path)
+    scores["brca_status"] = brca_status_from_hrd_score(scores["hrd_score"])
+    return scores, log, str(tsv_path.resolve())
 
-    tsv_path = Path(tsv_str)
-    if not tsv_path.is_file():
-        raise FileNotFoundError(f"HRD 结果文件不存在: {tsv_path}")
 
+def run_wes_for_sample(
+    sample: Sample,
+    *,
+    analysis_task_id: int | None = None,
+) -> tuple[dict[str, Any], str, str]:
+    """
+    执行 WES 全流程。返回 (result_dict_for_HRDResult, combined_log, result_tsv_path)。
+    与 WGS 相同：FASTQ 链入 work 目录，run.log + HRD_result/。
+    """
+    paths = collect_fastq_by_role(sample)
+    work_dir, normal_prefix, tumor_prefix = prepare_wgs_workdir(sample, paths)
+    pair_id = sanitize_pair_id(sample)
+    hrd_result_dir = work_dir / "HRD_result"
+    hrd_result_dir.mkdir(parents=True, exist_ok=True)
+
+    run_sh = pipeline_scripts_dir() / "run_wes.sh"
+    if not run_sh.is_file():
+        raise FileNotFoundError(f"未找到 run_wes.sh: {run_sh}")
+
+    env = os.environ.copy()
+    env["HRD_APPEND_LOG"] = "1"
+    rscript = getattr(settings, "HRD_RSCRIPT", None)
+    if rscript:
+        env["RSCRIPT"] = rscript
+
+    cmd: list[str] = [
+        "/bin/bash",
+        str(run_sh),
+        "-n",
+        normal_prefix,
+        "-t",
+        tumor_prefix,
+        "-p",
+        pair_id,
+        "-N",
+        f"{sample.sample_code}_normal",
+        "-T",
+        f"{sample.sample_code}_tumor",
+        "-a",
+        f"{sample.sample_code}_normal_lb",
+        "-b",
+        f"{sample.sample_code}_tumor_lb",
+        "-o",
+        str(hrd_result_dir.resolve()),
+    ]
+    threads = getattr(settings, "HRD_WES_THREADS", None)
+    if threads:
+        cmd.extend(["-@", str(threads)])
+    ref_fa = getattr(settings, "HRD_WES_REF_FA", None)
+    if ref_fa:
+        cmd.extend(["-r", str(ref_fa)])
+    scar_ref = getattr(settings, "HRD_WES_SCAR_REFERENCE", None)
+    if scar_ref:
+        cmd.extend(["-G", str(scar_ref)])
+
+    log_path = work_dir / "run.log"
+    cmd_line = " ".join(shlex.quote(c) for c in cmd)
+    with open(log_path, "w", encoding="utf-8") as logf:
+        logf.write("=== HRD WES run log ===\n")
+        logf.write(f"started_at: {timezone.now().isoformat()}\n")
+        logf.write(f"sample_uuid: {sample.id}\n")
+        logf.write(f"sample_code: {sample.sample_code}\n")
+        if analysis_task_id is not None:
+            logf.write(f"analysis_task_id: {analysis_task_id}\n")
+        logf.write(f"log_file: {log_path.resolve()}\n")
+        logf.write("--- command ---\n")
+        logf.write(cmd_line + "\n")
+        logf.write("--- pipeline output (run_wes.sh 经 tee 追加) ---\n")
+        logf.flush()
+
+    run_kw: dict = dict(
+        cwd=str(pipeline_scripts_dir().parent),
+        env=env,
+    )
+    _timeout = getattr(settings, "HRD_WES_SUBPROCESS_TIMEOUT", None)
+    if _timeout and _timeout > 0:
+        run_kw["timeout"] = _timeout
+    proc = subprocess.run(cmd, **run_kw)
+
+    log = log_path.read_text(encoding="utf-8")
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"run_wes.sh 退出码 {proc.returncode}，完整日志: {log_path}\n{log[-8000:]}"
+        )
+
+    tsv_path = resolve_hrd_result_tsv_path(log, hrd_result_dir, pair_id)
     scores = parse_final_hrd_tsv(tsv_path)
     scores["brca_status"] = brca_status_from_hrd_score(scores["hrd_score"])
     return scores, log, str(tsv_path.resolve())

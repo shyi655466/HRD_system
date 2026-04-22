@@ -1,0 +1,15 @@
+# Django API（Gunicorn）与 Celery Worker 共用镜像；compose 里 worker 覆盖 command
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app/backend
+
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/ /app/backend/
+
+ENV PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=backend.settings
+
+EXPOSE 8000
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "600", "backend.wsgi:application"]

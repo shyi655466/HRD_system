@@ -1,0 +1,20 @@
+# Django / API（与 backend/backend/settings.py 声明一致；代码扫描无其它直接依赖）
+python-dotenv>=1.0
+# 与 settings 注释中的 5.2.9 对齐；上限 <6 避免未验证的大版本升级
+Django>=5.2.9,<6
+djangorestframework>=3.15,<4
+djangorestframework-simplejwt>=5.4
+# PyJWT 由 simplejwt 作为依赖安装，无需写入本文件
+
+# Celery / 缓存
+celery[redis]>=5.4
+redis>=5.0
+
+# MySQL（backend/backend/__init__.py 使用 pymysql.install_as_MySQLdb()）
+pymysql>=1.1.0
+
+# 日志
+loguru>=0.7
+
+# 生产/容器内 WSGI（docker compose web 服务）
+gunicorn>=22.0

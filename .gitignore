@@ -8,7 +8,9 @@ __pycache__/
 # 忽略环境
 envs/
 env/
-.env.example
+env.conda.bak
+# 本机私密配置（从 .env.example 复制后填写）；勿提交
+.env
 
 # 忽略 VSCode 配置
 .vscode/
@@ -22,3 +24,6 @@ test/
 
 pipeline/work/
 pipeline/ref/
+
+# 前端生产构建产物（按需由 nginx profile 挂载）
+frontend/dist/

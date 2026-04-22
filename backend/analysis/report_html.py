@@ -1,5 +1,5 @@
 """
-HRD 静态 HTML 报告生成（供 Celery 写入 hrd_result/HRD_report.html）。
+HRD 静态 HTML 报告生成（供 Celery 写入 HRD_result/HRD_report.html）。
 与前端报告章节对齐的精简版，所有动态文本经 html.escape 处理。
 """
 from __future__ import annotations
@@ -136,7 +136,7 @@ def build_hrd_report_html(sample: Sample, result: HRDResult) -> str:
   </table>
   {qc_block}
   <h2>{method_num}、方法学说明</h2>
-  <p>HRD 综合评分基于 scarHRD 等方法对 LOH、TAI、LST 等指标整合计算。本报告文件由分析完成后异步任务写入 hrd_result 目录。</p>
+  <p>HRD 综合评分基于 scarHRD 等方法对 LOH、TAI、LST 等指标整合计算。本报告文件由分析完成后异步任务写入 HRD_result 目录。</p>
 </body>
 </html>
 """
