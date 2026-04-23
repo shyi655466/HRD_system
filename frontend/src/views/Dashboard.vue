@@ -153,8 +153,8 @@
             </div>
           </template>
           <ul class="notice-list">
-            <li>初版：WGS 全流程分析（服务器路径导入 FASTQ）；统一报告页支持 JSON/CSV 导出与打印。</li>
-            <li>非 WGS 样本可录入，但「开始分析」将提示仅支持 WGS。</li>
+            <li>初版：WGS、WES 全流程（服务器路径导入 FASTQ，分别调用 run_wgs.sh 与 run_wes.sh）；统一报告页支持 JSON/CSV 导出与打印。</li>
+            <li>仅 SNP Panel 类型可录入但「开始分析」暂不支持；WGS、WES 可正常排队分析。</li>
             <li>大文件浏览器分片上传、PDF 报告等未在本版本实现。</li>
           </ul>
         </el-card>

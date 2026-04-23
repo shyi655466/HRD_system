@@ -2,20 +2,31 @@
 set -euo pipefail
 
 # ================= 配置区域 =================
-FASTP_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/fastp"
-BWA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/bwa"
-SAMTOOLS_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/samtools"
-JAVA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/java"
-PICARD_JAR="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/share/picard-3.4.0-0/picard.jar"
+# 可选环境变量（与 backend settings 对齐）:
+#   HRD_PIPELINE_ROOT     — pipeline 根目录（默认：本脚本所在目录的上一级）
+#   HRD_WGS_REF_FA        — BWA 参考 FASTA（默认: /data/database/hg38/hg38.fa）
+#   HRD_WGS_GC_WIG        — Sequenza GC wig（本脚本未使用，供下游/文档约定）
+#   HRD_WGS_FASTP 等      — 覆盖各可执行文件 / picard.jar 路径
+#   HRD_WGS_THREADS       — 默认线程数（可被 -@ 覆盖）
+#   RG_PL / KEEP_*        — 见下方
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_DEFAULT_PIPELINE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PIPELINE_ROOT="${HRD_PIPELINE_ROOT:-${_DEFAULT_PIPELINE_ROOT}}"
+
+FASTP_CMD="${HRD_WGS_FASTP:-${PIPELINE_ROOT}/envs/bin/fastp}"
+BWA_CMD="${HRD_WGS_BWA:-${PIPELINE_ROOT}/envs/bin/bwa}"
+SAMTOOLS_CMD="${HRD_WGS_SAMTOOLS:-${PIPELINE_ROOT}/envs/bin/samtools}"
+JAVA_CMD="${HRD_WGS_JAVA:-${PIPELINE_ROOT}/envs/bin/java}"
+PICARD_JAR="${HRD_WGS_PICARD_JAR:-${PIPELINE_ROOT}/envs/share/picard-3.4.0-0/picard.jar}"
 
 # 默认参数
-THREADS=8
-REF_FA="/data/database/hg38/hg38.fa"
-GC_WIG="/data/database/hg38/hg38_gc50_sequenza.wig.gz"
+THREADS="${HRD_WGS_THREADS:-8}"
+REF_FA="${HRD_WGS_REF_FA:-/data/database/hg38/hg38.fa}"
+GC_WIG="${HRD_WGS_GC_WIG:-/data/database/hg38/hg38_gc50_sequenza.wig.gz}"
 BIN_WINDOW=50
-RG_PL="ILLUMINA"
-KEEP_CLEAN_FASTQ="false"
-KEEP_SORTED_BAM="false"
+RG_PL="${HRD_WGS_RG_PL:-ILLUMINA}"
+KEEP_CLEAN_FASTQ="${HRD_WGS_KEEP_CLEAN_FASTQ:-false}"
+KEEP_SORTED_BAM="${HRD_WGS_KEEP_SORTED_BAM:-false}"
 # ===========================================
 
 usage() {
@@ -37,8 +48,8 @@ Required:
   -b <tumor_lb>        肿瘤样本 RG:LB
 
 Optional:
-  -@ <threads>         线程数，默认 8
-  -r <ref_fa>          参考基因组 fasta，默认 /data/database/hg38/hg38.fa
+  -@ <threads>         线程数，默认 8（可用环境变量 HRD_WGS_THREADS 作为默认值）
+  -r <ref_fa>          参考基因组 fasta；未指定时用环境变量 HRD_WGS_REF_FA，再缺省为 /data/database/hg38/hg38.fa
   -h                   显示帮助
 
 断点续跑:

@@ -1,0 +1,35 @@
+# 生信 Conda 环境「配方」：应提交到 git。实际环境目录（如 envs/、env/）在 .gitignore 中、勿提交。
+#
+# 与 backend/requirements.txt 分工：
+#   - requirements.txt  →  Django / Celery / API（pip + 虚拟环境）
+#   - 本文件              →  WGS、WES 管线：fastp、bwa、R、Sequenza 等（conda）
+#
+# 新建环境：
+#   conda env create -f pipeline/environment.yml
+#   conda activate hrd_pipeline
+#
+# 本仓库脚本默认在 ${PIPELINE_ROOT}/envs/bin 下找工具。可将该环境
+# 软链/复制为 <仓库>/pipeline/envs/，或设置各 `*.sh` 中已有环境变量覆盖路径。
+#
+# R 包 scarHRD、ASCAT 相关依赖在 Conda 中常不完整，多需在激活本环境后单独安装
+#（例如 remotes::install_github("sztup/scarHRD") 等，以你当前跑通流程的文档为准）。
+# 在**已能跑通全流程**的机器上锁定版本，推荐：
+#   conda activate hrd_pipeline
+#   conda env export --no-builds | sed '/^prefix:/d' > pipeline/environment.lock.yml
+# 之后新环境：conda env create -f pipeline/environment.lock.yml
+#
+name: hrd_pipeline
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - fastp
+  - bwa
+  - samtools
+  - openjdk
+  - picard
+  - r-base
+  - r-essentials
+  # Sequenza 等：不同 Conda 频道中包名可能不同，若 solve 失败可删掉下一行，改从已工作机
+  # 执行 conda env export 再合并；或在环境中用 pip、BiocManager 等按 wes_upstream 需求安装。
+  - r-sequenza

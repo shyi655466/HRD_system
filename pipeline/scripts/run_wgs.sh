@@ -8,9 +8,11 @@ set -euo pipefail
 #   bash pipeline/scripts/run_wgs.sh \
 #     -n <normal_prefix> -t <tumor_prefix> -p <pair_id> \
 #     -N <normal_sm> -T <tumor_sm> -a <normal_lb> -b <tumor_lb> \
-#     [-@ <threads>] [-r <ref_fa>] [-o <hrd_result_dir>]
+#     [-@ <threads>] [-r <ref_fa>] [-o <HRD_out_dir>]
 #
-# 未指定 -o 时，HRD 目录默认为: $(dirname <tumor.dedup.bam>)/hrd_result
+# 未指定 -o 时，HRD 目录默认为: $(dirname <tumor_prefix>)/HRD_result
+# 全流程 stdout/stderr 追加写入: $(dirname <tumor_prefix>)/run.log
+# 若已由上游写入 run.log 前言（如 Django），请设置 HRD_APPEND_LOG=1 避免清空该文件。
 #
 # 环境变量（可选）:
 #   RSCRIPT  — Rscript 可执行文件，默认 pipeline/envs/bin/Rscript
@@ -28,7 +30,7 @@ usage() {
 Usage:
   $0 -n <normal_prefix> -t <tumor_prefix> -p <pair_id> \\
      -N <normal_sm> -T <tumor_sm> -a <normal_lb> -b <tumor_lb> \\
-     [-@ <threads>] [-r <ref_fa>] [-o <hrd_result_dir>]
+     [-@ <threads>] [-r <ref_fa>] [-o <HRD_out_dir>]
 
   -h  显示帮助
 
@@ -124,6 +126,20 @@ fi
 
 [[ -f "${UPSTREAM_SH}" ]] || { echo "Error: 未找到 ${UPSTREAM_SH}" >&2; exit 1; }
 
+TUMOR_PREFIX="$(abs_path "${TUMOR_PREFIX}")"
+NORMAL_PREFIX="$(abs_path "${NORMAL_PREFIX}")"
+WORK_DIR="$(dirname "${TUMOR_PREFIX}")"
+LOG_PATH="${WORK_DIR}/run.log"
+mkdir -p "${WORK_DIR}"
+if [[ -z "${HRD_APPEND_LOG:-}" ]]; then
+  : > "${LOG_PATH}"
+fi
+exec > >(tee -a "${LOG_PATH}") 2>&1
+
+echo "=== HRD WGS run log (bash) ==="
+echo "log_file: ${LOG_PATH}"
+echo "started_at: $(date -Iseconds 2>/dev/null || date)"
+
 UP_ARGS=(
   -n "${NORMAL_PREFIX}"
   -t "${TUMOR_PREFIX}"
@@ -150,7 +166,7 @@ TUMOR_BAM="$(abs_path "${TUMOR_BAM}")"
 NORMAL_BAM="$(abs_path "${NORMAL_BAM}")"
 
 if [[ -z "${HRD_OUT}" ]]; then
-  HRD_OUT="$(dirname "${TUMOR_BAM}")/hrd_result"
+  HRD_OUT="$(dirname "${TUMOR_BAM}")/HRD_result"
 else
   mkdir -p "${HRD_OUT}"
   HRD_OUT="$(abs_path "${HRD_OUT}")"

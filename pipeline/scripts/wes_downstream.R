@@ -15,15 +15,23 @@
 #   Rscript pipeline/scripts/wes_downstream.R \
 #     pipeline/test/pair1/pair1_small.seqz.gz \
 #     pair1 \
-#     pipeline/test/pair1/hrd_result \
+#     pipeline/test/pair1/HRD_result \
 #     grch38
 # ==============================================================================
 
 args <- commandArgs(trailingOnly = TRUE)
+argv <- commandArgs(trailingOnly = FALSE)
+file_arg <- grep("^--file=", argv, value = TRUE)
+script_dir <- if (length(file_arg)) {
+  dirname(normalizePath(sub("^--file=", "", file_arg[1]), winslash = "/"))
+} else {
+  getwd()
+}
+# 脚本位于 pipeline/scripts/，供后续扩展加载资源时使用
+pipeline_root <- dirname(script_dir)
 
 # ================= 配置区域 ============================
-PIPELINE_ROOT <- "/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline"
-DEFAULT_REFERENCE <- "grch38"
+DEFAULT_REFERENCE <- Sys.getenv("HRD_WES_SCAR_REFERENCE", unset = "grch38")
 # ======================================================
 
 if (length(args) < 3) {
@@ -68,7 +76,7 @@ safe_write_table <- function(df, file) {
 find_col <- function(df, candidates) {
   nm <- colnames(df)
   for (pat in candidates) {
-    idx <- grep(pat, nm, ignore.case = TRUE)
+    idx <- grep(pat, nm, ignore.case = TRUE, perl = TRUE)
     if (length(idx) > 0) return(nm[idx[1]])
   }
   stop("找不到列名，候选模式为: ", paste(candidates, collapse = ", "))
@@ -93,8 +101,8 @@ raw_score_df <- as.data.frame(raw_score)
 raw_tsv <- file.path(output_dir, paste0(sample_id, "_scarHRD_raw.tsv"))
 safe_write_table(raw_score_df, raw_tsv)
 
-# 兼容不同版本 scarHRD 输出列名
-loh_col <- find_col(raw_score_df, c("^HRD$", "^LOH$"))
+# 兼容不同版本 scarHRD 输出列名。seqz=TRUE 时常用列名 "HRD" 表示 LOH 计数；总分为 "HRD-sum"，与 ^HRD$ 不冲突
+loh_col <- find_col(raw_score_df, c("^LOH$", "^HRD$", "\\bLOH\\b"))
 tai_col <- find_col(raw_score_df, c("Telomeric", "^TAI$", "NtAI"))
 lst_col <- find_col(raw_score_df, c("^LST$"))
 sum_col <- find_col(raw_score_df, c("HRD.sum", "HRD-sum", "^sum$"))
@@ -120,3 +128,4 @@ message("scarHRD raw : ", raw_tsv)
 message("HRD TSV     : ", final_tsv)
 message("HRD CSV     : ", final_csv)
 message("======================================================")
+message("HRD_PIPELINE_RESULT_TSV=", final_tsv)

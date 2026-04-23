@@ -18,26 +18,50 @@
 # 示例:
 #   Rscript pipeline/scripts/wgs_downstream.R \
 #       pipeline/test/SAMN29155871/SRR19859026.dedup.bam pipeline/test/SAMN29155871/SRR19859027.dedup.bam \
-#       SAMN29155871 pipeline/test/SAMN29155871/hrd_result \
+#       SAMN29155871 pipeline/test/SAMN29155871/HRD_result \
 #       pipeline/envs/bin/alleleCounter \
 #       pipeline/ref/ASCAT/hg38/G1000_alleles_hg38_chr \
 #       pipeline/ref/ASCAT/hg38/G1000_loci_hg38_chr \
 #       pipeline/ref/ASCAT/hg38/GC_G1000_hg38.txt \
 #       pipeline/ref/ASCAT/hg38/RT_G1000_hg38.txt
+# 可选环境变量:
+#   HRD_PIPELINE_ROOT — pipeline 根目录（默认与历史路径一致）
+#   HRD_WGS_ALLELECOUNTER_EXE, HRD_WGS_ASCAT_ALLELES_PREFIX, HRD_WGS_ASCAT_LOCI_PREFIX,
+#   HRD_WGS_ASCAT_GC_FILE, HRD_WGS_ASCAT_RT_FILE, HRD_WGS_GENDER
 # ==============================================================================
 
-args <- commandArgs(trailingOnly = TRUE)
+hrd_env_or <- function(nm, fb) {
+  v <- Sys.getenv(nm, unset = "")
+  if (nzchar(v)) v else fb
+}
 
-# ================= 配置区域（绝对路径） =================
-PIPELINE_ROOT <- "/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline"
-DEFAULT_ALLELECOUNTER_EXE <- file.path(PIPELINE_ROOT, "envs", "bin", "alleleCounter")
-DEFAULT_ALLELES_PREFIX <- file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "G1000_alleles_hg38_chr", "G1000_alleles_hg38_chr")
+default_pipeline_root <- "/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline"
+PIPELINE_ROOT <- hrd_env_or("HRD_PIPELINE_ROOT", default_pipeline_root)
+
+DEFAULT_ALLELECOUNTER_EXE <- hrd_env_or(
+  "HRD_WGS_ALLELECOUNTER_EXE",
+  file.path(PIPELINE_ROOT, "envs", "bin", "alleleCounter")
+)
+DEFAULT_ALLELES_PREFIX <- hrd_env_or(
+  "HRD_WGS_ASCAT_ALLELES_PREFIX",
+  file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "G1000_alleles_hg38_chr", "G1000_alleles_hg38_chr")
+)
 # 对于 chr 风格 BAM（如 chr1），使用已加 chr 前缀的 loci 文件前缀
-DEFAULT_LOCI_PREFIX <- file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "G1000_loci_hg38_chr_prefixed", "G1000_loci_hg38_chr")
-DEFAULT_GC_FILE <- file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "GC_G1000_hg38.txt")
-DEFAULT_RT_FILE <- file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "RT_G1000_hg38.txt")
-DEFAULT_GENDER <- "XX"
-# ======================================================
+DEFAULT_LOCI_PREFIX <- hrd_env_or(
+  "HRD_WGS_ASCAT_LOCI_PREFIX",
+  file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "G1000_loci_hg38_chr_prefixed", "G1000_loci_hg38_chr")
+)
+DEFAULT_GC_FILE <- hrd_env_or(
+  "HRD_WGS_ASCAT_GC_FILE",
+  file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "GC_G1000_hg38.txt")
+)
+DEFAULT_RT_FILE <- hrd_env_or(
+  "HRD_WGS_ASCAT_RT_FILE",
+  file.path(PIPELINE_ROOT, "ref", "ASCAT", "hg38", "RT_G1000_hg38.txt")
+)
+DEFAULT_GENDER <- hrd_env_or("HRD_WGS_GENDER", "XX")
+
+args <- commandArgs(trailingOnly = TRUE)
 
 if (length(args) < 4) {
   stop(

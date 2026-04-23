@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from utils.logger import logger
 
-from .hrd_pipeline import run_wgs_for_sample, sample_hrd_result_dir
+from .hrd_pipeline import run_wes_for_sample, run_wgs_for_sample, sample_hrd_result_dir
 from .models import Sample, AnalysisTask, HRDResult
 from .report_html import build_hrd_report_html
 
@@ -14,7 +14,7 @@ from .report_html import build_hrd_report_html
 @shared_task
 def run_hrd_analysis(db_task_id, sample_id):
     """
-    异步 HRD 分析：初版仅 WGS，调用 pipeline/scripts/run_wgs.sh 并解析 TSV 写库。
+    异步 HRD 分析：WGS 调用 run_wgs.sh，WES 调用 run_wes.sh，解析 TSV 写库。
     """
     task = None
     sample = None
@@ -37,10 +37,13 @@ def run_hrd_analysis(db_task_id, sample_id):
     err_tail = ""
 
     try:
-        if sample.data_type != Sample.DataType.WGS:
+        if sample.data_type not in (
+            Sample.DataType.WGS,
+            Sample.DataType.WES,
+        ):
             raise ValueError(
-                "初版仅支持 WGS。当前样本数据类型为 "
-                f"{sample.get_data_type_display()}，请待后续版本。"
+                "仅支持 WGS / WES 分析。当前样本数据类型为 "
+                f"{sample.get_data_type_display()}。"
             )
 
         task.status = AnalysisTask.Status.RUNNING
@@ -50,10 +53,19 @@ def run_hrd_analysis(db_task_id, sample_id):
         sample.analysis_status = Sample.AnalysisStatus.RUNNING
         sample.save(update_fields=["analysis_status", "updated_at"])
 
-        print(f"任务 [{task.id}] 开始 WGS 流程: {sample.sample_code}")
-        result_data, pipe_log, result_tsv = run_wgs_for_sample(
-            sample, analysis_task_id=task.id
-        )
+        if sample.data_type == Sample.DataType.WGS:
+            print(f"任务 [{task.id}] 开始 WGS 流程: {sample.sample_code}")
+            result_data, pipe_log, result_tsv = run_wgs_for_sample(
+                sample, analysis_task_id=task.id
+            )
+            pipeline_version = "wgs_v1_celery"
+        else:
+            print(f"任务 [{task.id}] 开始 WES 流程: {sample.sample_code}")
+            result_data, pipe_log, result_tsv = run_wes_for_sample(
+                sample, analysis_task_id=task.id
+            )
+            pipeline_version = "wes_v1_celery"
+
         log_tail = (pipe_log or "")[-12000:]
 
         with transaction.atomic():
@@ -66,7 +78,7 @@ def run_hrd_analysis(db_task_id, sample_id):
                     "lst_score": result_data["lst_score"],
                     "brca_status": result_data["brca_status"],
                     "input_type": sample.data_type,
-                    "pipeline_version": "wgs_v1_celery",
+                    "pipeline_version": pipeline_version,
                     "analysis_date": timezone.now(),
                 },
             )
@@ -125,7 +137,7 @@ REPORT_FILENAME = "HRD_report.html"
 @shared_task(bind=True, name="analysis.generate_hrd_report_task")
 def generate_hrd_report_task(self, sample_id: str):
     """
-    HRD 分析成功后异步生成静态 HTML 报告，写入 pipeline/work/<UUID>/hrd_result/HRD_report.html，
+    HRD 分析成功后异步生成静态 HTML 报告，写入 pipeline/work/<UUID>/HRD_result/HRD_report.html，
     并更新 HRDResult.report_path；同时写入一条 REPORT_GENERATE 类型的 AnalysisTask 记录。
     """
     celery_id = ""

@@ -14,9 +14,14 @@ import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 自动加载仓库根目录 .env（与 .env.example 同级）；已存在于 os.environ 的键不会被覆盖
+_REPO_ROOT = BASE_DIR.parent
+load_dotenv(_REPO_ROOT / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -193,8 +198,7 @@ HRD_ALLOWED_IMPORT_ROOTS = [
     "/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test",
 ]
 
-# 生信 pipeline（相对仓库根目录，可用环境变量覆盖）
-_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+# 生信 pipeline（相对仓库根目录，可用环境变量覆盖；_REPO_ROOT 见文件顶部 load_dotenv 处）
 HRD_PIPELINE_ROOT = Path(os.environ.get("HRD_PIPELINE_ROOT", _REPO_ROOT / "pipeline"))
 HRD_PIPELINE_WORK_ROOT = Path(
     os.environ.get("HRD_PIPELINE_WORK_ROOT", _REPO_ROOT / "pipeline" / "work")
@@ -211,6 +215,17 @@ if _hrd_to:
     HRD_WGS_SUBPROCESS_TIMEOUT = _hrd_tov if _hrd_tov > 0 else None
 else:
     HRD_WGS_SUBPROCESS_TIMEOUT = None
+
+# WES：run_wes.sh 的 -r / -@ / -G；线程与超时未单独配置时与 WGS 共用缺省
+HRD_WES_REF_FA = os.environ.get("HRD_WES_REF_FA", HRD_WGS_REF_FA)
+HRD_WES_THREADS = os.environ.get("HRD_WES_THREADS", HRD_WGS_THREADS)
+HRD_WES_SCAR_REFERENCE = os.environ.get("HRD_WES_SCAR_REFERENCE", "").strip()
+_hrd_wes_to = os.environ.get("HRD_WES_SUBPROCESS_TIMEOUT", "").strip()
+if _hrd_wes_to:
+    _hrd_wes_tov = int(_hrd_wes_to)
+    HRD_WES_SUBPROCESS_TIMEOUT = _hrd_wes_tov if _hrd_wes_tov > 0 else None
+else:
+    HRD_WES_SUBPROCESS_TIMEOUT = HRD_WGS_SUBPROCESS_TIMEOUT
 
 # HRD 阳性判定：总分 >= 该值视为阳性（与前端展示一致；可用环境变量 HRD_POSITIVE_SCORE_MIN 覆盖）
 _hrd_pos = os.environ.get("HRD_POSITIVE_SCORE_MIN", "").strip()

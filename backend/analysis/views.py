@@ -84,12 +84,15 @@ class StartAnalysisView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if sample.data_type != Sample.DataType.WGS:
+        if sample.data_type not in (
+            Sample.DataType.WGS,
+            Sample.DataType.WES,
+        ):
             return Response(
                 {
                     "detail": (
-                        "初版仅支持 WGS 分析。当前样本数据类型为 "
-                        f"{sample.get_data_type_display()}，请新建 WGS 样本或待后续版本。"
+                        "仅支持 WGS / WES 分析。当前样本数据类型为 "
+                        f"{sample.get_data_type_display()}，请选用 WGS 或 WES 样本。"
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,

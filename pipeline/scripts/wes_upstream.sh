@@ -2,19 +2,33 @@
 set -euo pipefail
 
 # ================= 配置区域 =================
-FASTP_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/fastp"
-BWA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/bwa"
-SAMTOOLS_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/samtools"
-SEQUENZA_UTILS_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/sequenza-utils"
-JAVA_CMD="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/bin/java"
-PICARD_JAR="/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/envs/share/picard-3.4.0-0/picard.jar"
+# 可选环境变量（与 wgs_upstream 对齐，可共用 HRD_WGS_* 工具链；本机或服务器上按需 export）:
+#   HRD_PIPELINE_ROOT          — pipeline 根目录（默认：本脚本所在目录的上一级）
+#   HRD_WGS_FASTP / BWA / SAMTOOLS / JAVA / PICARD_JAR — 与 wgs_upstream 相同约定
+#   HRD_WES_SEQUENZA_UTILS       — sequenza-utils（默认: ${PIPELINE_ROOT}/envs/bin/sequenza-utils）
+#   HRD_WES_REF_FA               — 未设置时继承 HRD_WGS_REF_FA，再缺省 /data/database/hg38/hg38.fa
+#   HRD_WES_GC_WIG               — 未设置时继承 HRD_WGS_GC_WIG，再缺省 .../hg38_gc50_sequenza.wig.gz
+#   HRD_WES_THREADS              — 未设置时继承 HRD_WGS_THREADS，再缺省 8（仍可由 -t 覆盖）
+#   HRD_WES_BIN_WIDTH            — Sequenza 分箱宽度，默认 50（仍可由 -w 覆盖）
+#   HRD_WES_RG_PL                — 未设置时继承 HRD_WGS_RG_PL，再缺省 ILLUMINA
+#   HRD_WES_KEEP_CLEAN_FASTQ     — 未设置时继承 HRD_WGS_KEEP_CLEAN_FASTQ，再缺省 false
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_DEFAULT_PIPELINE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PIPELINE_ROOT="${HRD_PIPELINE_ROOT:-${_DEFAULT_PIPELINE_ROOT}}"
 
-THREADS=8
-REF_FA="/data/database/hg38/hg38.fa"
-GC_WIG="/data/database/hg38/hg38_gc50_sequenza.wig.gz"
-RG_PL="ILLUMINA"
-BIN_WIDTH=50
-KEEP_CLEAN_FASTQ="true"   # true=保留 clean fastq, false=删除
+FASTP_CMD="${HRD_WGS_FASTP:-${PIPELINE_ROOT}/envs/bin/fastp}"
+BWA_CMD="${HRD_WGS_BWA:-${PIPELINE_ROOT}/envs/bin/bwa}"
+SAMTOOLS_CMD="${HRD_WGS_SAMTOOLS:-${PIPELINE_ROOT}/envs/bin/samtools}"
+JAVA_CMD="${HRD_WGS_JAVA:-${PIPELINE_ROOT}/envs/bin/java}"
+PICARD_JAR="${HRD_WGS_PICARD_JAR:-${PIPELINE_ROOT}/envs/share/picard-3.4.0-0/picard.jar}"
+SEQUENZA_UTILS_CMD="${HRD_WES_SEQUENZA_UTILS:-${PIPELINE_ROOT}/envs/bin/sequenza-utils}"
+
+THREADS="${HRD_WES_THREADS:-${HRD_WGS_THREADS:-8}}"
+REF_FA="${HRD_WES_REF_FA:-${HRD_WGS_REF_FA:-/data/database/hg38/hg38.fa}}"
+GC_WIG="${HRD_WES_GC_WIG:-${HRD_WGS_GC_WIG:-/data/database/hg38/hg38_gc50_sequenza.wig.gz}}"
+BIN_WIDTH="${HRD_WES_BIN_WIDTH:-50}"
+RG_PL="${HRD_WES_RG_PL:-${HRD_WGS_RG_PL:-ILLUMINA}}"
+KEEP_CLEAN_FASTQ="${HRD_WES_KEEP_CLEAN_FASTQ:-${HRD_WGS_KEEP_CLEAN_FASTQ:-false}}"
 # ==========================================
 
 usage() {
@@ -35,11 +49,15 @@ Required:
   -d <normal_rg_lb>    对照样本 RG LB
 
 Optional:
-  -t <threads>         线程数，默认 8
-  -r <ref_fa>          参考基因组 fasta，默认 /data/database/hg38/hg38.fa
-  -g <gc_wig>          GC wig 文件，默认 /data/database/hg38/hg38_gc50_sequenza.wig.gz
+  -t <threads>         线程数；默认来自 HRD_WES_THREADS / HRD_WGS_THREADS / 8
+  -r <ref_fa>          参考基因组 fasta；默认 HRD_WES_REF_FA / HRD_WGS_REF_FA / /data/database/hg38/hg38.fa
+  -g <gc_wig>          GC wig；默认 HRD_WES_GC_WIG / HRD_WGS_GC_WIG / hg38_gc50_sequenza.wig.gz
   -o <seqz_prefix>     输出前缀，默认 <tumor_prefix>_vs_<normal_prefix>
+  -w <bin_width>       Sequenza 分箱宽度；默认 HRD_WES_BIN_WIDTH / 50
   -h                   显示帮助
+
+环境变量与工具路径:
+  工具默认位于 \${HRD_PIPELINE_ROOT:-<仓库>/pipeline}/envs/bin；若 Conda 环境不在此路径，可设 HRD_PIPELINE_ROOT 为实际 pipeline 根目录，或使用 HRD_WGS_* 等变量指向各可执行文件。
 EOF
     exit 1
 }
@@ -101,7 +119,10 @@ build_dedup_bam() {
     local sorted_bam="${prefix}.sorted.bam"
     local dedup_bam="${prefix}.dedup.bam"
     local metrics="${prefix}.marked_dup_metrics.txt"
-    local rg="@RG\tID:${prefix}\tSM:${rg_sm}\tPL:${RG_PL}\tLB:${rg_lb}"
+    # 使用 basename 作为 @RG ID，避免绝对路径前缀含特殊字符或过长
+    local rg_id
+    rg_id="$(basename "${prefix}")"
+    local rg="@RG\tID:${rg_id}\tSM:${rg_sm}\tPL:${RG_PL}\tLB:${rg_lb}"
 
     log "开始处理样本: ${prefix}"
     log "  FQ1: ${fq1}"
@@ -174,6 +195,11 @@ run_sequenza() {
 
     local seqz="${out_prefix}.seqz.gz"
     local small_seqz="${out_prefix}_small.seqz.gz"
+
+    if [[ -f "${small_seqz}" ]]; then
+        log "[Sequenza] 已存在分箱 seqz，跳过 bam2seqz / seqz_binning: ${small_seqz}"
+        return 0
+    fi
 
     log "[Sequenza] Step 1/2 bam2seqz"
     "${SEQUENZA_UTILS_CMD}" bam2seqz \
