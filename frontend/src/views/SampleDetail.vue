@@ -31,8 +31,9 @@
             </div>
         </div>
 
-        <el-row :gutter="20">
-            <el-col :xs="24" :lg="16">
+        <el-row :gutter="20" class="detail-top-row">
+            <el-col :xs="24" :lg="16" class="detail-top-left">
+                <div class="detail-left-stack">
                 <el-card shadow="hover" class="detail-card">
                     <template #header>
                         <div class="card-header">基础信息</div>
@@ -94,8 +95,79 @@
                         </el-table-column>
                     </el-table>
                 </el-card>
+                </div>
+            </el-col>
 
-                <el-card shadow="hover" class="detail-card">
+            <el-col :xs="24" :lg="8" class="detail-top-right">
+                <div class="detail-right-stack">
+                <el-card shadow="hover" class="detail-card detail-card--stretch">
+                    <template #header>
+                        <div class="card-header">状态概览</div>
+                    </template>
+
+                    <div class="overview-list" v-if="sampleDetail">
+                        <div class="overview-item">
+                            <span class="overview-label">分析状态</span>
+                            <el-tag :type="analysisStatusTag(sampleDetail.analysis_status)" effect="light">
+                                {{ analysisStatusText(sampleDetail.analysis_status) }}
+                            </el-tag>
+                        </div>
+
+                        <div class="overview-item">
+                            <span class="overview-label">任务数量</span>
+                            <span class="overview-value">{{ sampleDetail.tasks?.length || 0 }}</span>
+                        </div>
+
+                        <div class="overview-item">
+                            <span class="overview-label">最近任务</span>
+                            <span class="overview-value">
+                                {{ taskStatusText(sampleDetail.tasks?.[0]?.status) }}
+                            </span>
+                        </div>
+                    </div>
+                </el-card>
+
+                <el-card shadow="hover" class="detail-card detail-card--stretch result-card">
+                    <template #header>
+                        <div class="card-header">结果摘要</div>
+                    </template>
+
+                    <div v-if="sampleDetail?.result" class="result-list result-list--fill">
+                        <div class="result-item">
+                            <span class="result-label">HRD评分</span>
+                            <span class="result-value">{{ sampleDetail.result.hrdScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">LOH评分</span>
+                            <span class="result-value">{{ sampleDetail.result.lohScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">TAI评分</span>
+                            <span class="result-value">{{ sampleDetail.result.taiScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">LST评分</span>
+                            <span class="result-value">{{ sampleDetail.result.lstScore ?? '-' }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">BRCA状态</span>
+                            <span class="result-value">{{ brcaLabel(sampleDetail.result.brcaStatus) }}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">分析时间</span>
+                            <span class="result-value">{{ formatDate(sampleDetail.result.analysisDate) }}</span>
+                        </div>
+                    </div>
+
+                    <el-empty v-else description="暂无分析结果" class="result-empty-fill" />
+                </el-card>
+                </div>
+            </el-col>
+        </el-row>
+
+        <el-row :gutter="20" class="detail-bottom-row">
+            <el-col :span="24">
+                <el-card shadow="hover" class="detail-card detail-card--tasks">
                     <template #header>
                         <div class="card-header">分析记录</div>
                     </template>
@@ -133,70 +205,6 @@
                             </template>
                         </el-table-column>
                     </el-table>
-                </el-card>
-            </el-col>
-
-            <el-col :xs="24" :lg="8">
-                <el-card shadow="hover" class="detail-card">
-                    <template #header>
-                        <div class="card-header">状态概览</div>
-                    </template>
-
-                    <div class="overview-list" v-if="sampleDetail">
-                        <div class="overview-item">
-                            <span class="overview-label">分析状态</span>
-                            <el-tag :type="analysisStatusTag(sampleDetail.analysis_status)" effect="light">
-                                {{ analysisStatusText(sampleDetail.analysis_status) }}
-                            </el-tag>
-                        </div>
-
-                        <div class="overview-item">
-                            <span class="overview-label">任务数量</span>
-                            <span class="overview-value">{{ sampleDetail.tasks?.length || 0 }}</span>
-                        </div>
-
-                        <div class="overview-item">
-                            <span class="overview-label">最近任务</span>
-                            <span class="overview-value">
-                                {{ taskStatusText(sampleDetail.tasks?.[0]?.status) }}
-                            </span>
-                        </div>
-                    </div>
-                </el-card>
-
-                <el-card shadow="hover" class="detail-card result-card">
-                    <template #header>
-                        <div class="card-header">结果摘要</div>
-                    </template>
-
-                    <div v-if="sampleDetail?.result" class="result-list">
-                        <div class="result-item">
-                            <span class="result-label">HRD评分</span>
-                            <span class="result-value">{{ sampleDetail.result.hrdScore ?? '-' }}</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">LOH评分</span>
-                            <span class="result-value">{{ sampleDetail.result.lohScore ?? '-' }}</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">TAI评分</span>
-                            <span class="result-value">{{ sampleDetail.result.taiScore ?? '-' }}</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">LST评分</span>
-                            <span class="result-value">{{ sampleDetail.result.lstScore ?? '-' }}</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">BRCA状态</span>
-                            <span class="result-value">{{ brcaLabel(sampleDetail.result.brcaStatus) }}</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">分析时间</span>
-                            <span class="result-value">{{ formatDate(sampleDetail.result.analysisDate) }}</span>
-                        </div>
-                    </div>
-
-                    <el-empty v-else description="暂无分析结果" />
                 </el-card>
             </el-col>
         </el-row>
@@ -462,6 +470,88 @@ onUnmounted(() => {
   border-radius: 16px;
 }
 
+.detail-top-row {
+  align-items: stretch;
+}
+
+.detail-top-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-left-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+}
+
+.detail-left-stack .detail-card {
+  margin-bottom: 0;
+}
+
+.detail-top-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-right-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-right-stack .detail-card {
+  margin-bottom: 0;
+}
+
+@media (min-width: 992px) {
+  .detail-top-right {
+    min-height: 100%;
+  }
+
+  .detail-right-stack {
+    flex: 1;
+    min-height: 100%;
+  }
+
+  .detail-card--stretch {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-card--stretch :deep(.el-card__body) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .detail-card--stretch .overview-list,
+  .detail-card--stretch .result-list--fill {
+    flex: 1;
+  }
+
+  .detail-card--stretch .result-empty-fill {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 24px 0;
+  }
+}
+
+.detail-bottom-row {
+  margin-top: 20px;
+}
+
+.detail-bottom-row .detail-card--tasks {
+  margin-bottom: 20px;
+}
+
 .card-header {
   font-size: 16px;
   font-weight: 600;
@@ -495,10 +585,6 @@ onUnmounted(() => {
   font-weight: 600;
   text-align: right;
   word-break: break-word;
-}
-
-.result-card {
-  min-height: 320px;
 }
 
 /* 与终端一致保留换行与空格 */

@@ -28,7 +28,10 @@ def _fmt_dt(dt) -> str:
     if not dt:
         return "—"
     if isinstance(dt, datetime):
-        return timezone.localtime(dt).strftime("%Y-%m-%d %H:%M:%S")
+        # USE_TZ=False 时 ORM 常为 naive datetime，不能对 naive 调 localtime()
+        if timezone.is_aware(dt):
+            return timezone.localtime(dt).strftime("%Y-%m-%d %H:%M:%S")
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
     return html.escape(str(dt).replace("T", " ")[:19])
 
 

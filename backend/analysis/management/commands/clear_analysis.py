@@ -42,10 +42,26 @@ class Command(BaseCommand):
             action="store_true",
             help="只打印将删除/更新的数量，不写数据库",
         )
+        parser.add_argument(
+            "--sample-id",
+            dest="sample_id",
+            default=None,
+            help="仅清理该样本 UUID 下的进行中任务（适合 Celery 重启后单个样本卡在「分析中」）",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        sample_filter = options.get("sample_id")
         wip = AnalysisTask.objects.filter(status__in=WIP_STATUSES)
+        if sample_filter:
+            wip = wip.filter(sample_id=sample_filter)
+            if not wip.exists() and not dry_run:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"样本 {sample_filter} 下无 PENDING/QUEUED/RUNNING 任务，无需清理"
+                    )
+                )
+                return
         sample_ids = list(wip.values_list("sample_id", flat=True).distinct())
         n_tasks = wip.count()
 

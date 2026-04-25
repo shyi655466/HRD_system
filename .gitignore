@@ -3,7 +3,7 @@ __pycache__/
 
 # 忽略日志文件
 *.log
-*.logs
+logs/
 
 # 忽略环境
 envs/

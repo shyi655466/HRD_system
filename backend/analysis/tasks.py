@@ -1,7 +1,7 @@
 # analysis/tasks.py
 import traceback
 from celery import shared_task
-from django.db import transaction
+from django.db import connections, transaction
 from django.utils import timezone
 
 from utils.logger import logger
@@ -53,6 +53,10 @@ def run_hrd_analysis(db_task_id, sample_id):
         sample.analysis_status = Sample.AnalysisStatus.RUNNING
         sample.save(update_fields=["analysis_status", "updated_at"])
 
+        # 子流程可能持续数小时；若保持本 worker 的数据库连接，易触发 MySQL wait_timeout
+        # 导致结束时 OperationalError(2006)，且 on_commit 不会执行、HTML 报告任务不会入队。
+        connections.close_all()
+
         if sample.data_type == Sample.DataType.WGS:
             print(f"任务 [{task.id}] 开始 WGS 流程: {sample.sample_code}")
             result_data, pipe_log, result_tsv = run_wgs_for_sample(
@@ -67,6 +71,8 @@ def run_hrd_analysis(db_task_id, sample_id):
             pipeline_version = "wes_v1_celery"
 
         log_tail = (pipe_log or "")[-12000:]
+
+        connections.close_all()
 
         with transaction.atomic():
             HRDResult.objects.update_or_create(
@@ -110,6 +116,7 @@ def run_hrd_analysis(db_task_id, sample_id):
 
     except Exception as e:
         err_tail = traceback.format_exc()[-2000:]
+        connections.close_all()
         if task:
             task.status = AnalysisTask.Status.FAILED
             task.finished_at = timezone.now()
@@ -148,6 +155,7 @@ def generate_hrd_report_task(self, sample_id: str):
         celery_id = ""
 
     db_task = None
+    connections.close_all()
     try:
         sample = Sample.objects.select_related("hrd_result").get(pk=sample_id)
     except Sample.DoesNotExist:
