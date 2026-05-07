@@ -12,6 +12,23 @@ const request = axios.create({
   timeout: 10000,
 })
 
+const getBusinessMessage = (data) => {
+  if (!data) return ''
+  if (typeof data === 'string') return data
+  return data.message || data.detail || data.error || ''
+}
+
+const isBusinessError = (response) => {
+  const data = response?.data
+  const originalStatus = Number(response?.headers?.['x-original-status-code'])
+
+  if (Number.isFinite(originalStatus) && originalStatus >= 400) return true
+  if (data?.status === 'error') return true
+  if (Number(data?.code) >= 4000) return true
+
+  return false
+}
+
 request.interceptors.request.use(
   (config) => {
     const token = getToken()
@@ -24,7 +41,28 @@ request.interceptors.request.use(
 )
 
 request.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    if (!isBusinessError(response)) return response.data
+
+    const originalStatus = Number(response.headers?.['x-original-status-code'])
+    const message = getBusinessMessage(response.data) || '请求失败，请稍后重试'
+    const businessError = new Error(message)
+    businessError.response = response
+    businessError.data = response.data
+    businessError.status = Number.isFinite(originalStatus)
+      ? originalStatus
+      : response.status
+
+    if (businessError.status === 401) {
+      removeToken()
+      ElMessage.error('登录已失效，请重新登录')
+      router.push('/login')
+    } else {
+      ElMessage.error(message)
+    }
+
+    return Promise.reject(businessError)
+  },
   (error) => {
     const status = error?.response?.status
 
@@ -33,7 +71,7 @@ request.interceptors.response.use(
       ElMessage.error('登录已失效，请重新登录')
       router.push('/login')
     } else {
-      ElMessage.error(error?.response?.data?.detail || '请求失败，请稍后重试')
+      ElMessage.error(getBusinessMessage(error?.response?.data) || '请求失败，请稍后重试')
     }
 
     return Promise.reject(error)

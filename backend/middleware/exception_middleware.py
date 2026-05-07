@@ -13,7 +13,12 @@ class GlobalExceptionMiddleware:
         
         response = self.get_response(request)
         
-        # 响应返回前端之前的操作可以写在这里
+        # 统一将业务/框架错误响应的 HTTP 状态码改为 200，
+        # 错误类型继续由响应体中的 detail/code/status 等业务字段表达。
+        if response.status_code >= 400:
+            response["X-Original-Status-Code"] = str(response.status_code)
+            response.status_code = 200
+
         return response
 
     def process_exception(self, request, exception):
@@ -33,6 +38,4 @@ class GlobalExceptionMiddleware:
             "data": None,
         }
         
-        # 返回 200 状态码但包含错误 code，或者直接返回 500 状态码，取决于你的前端 axios 怎么配置
-        # 通常现代前后端分离项目习惯返回 200 HTTP 状态，在业务 code 里标识错误
         return JsonResponse(response_data, status=200, json_dumps_params={'ensure_ascii': False})

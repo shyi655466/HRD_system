@@ -120,10 +120,35 @@
 
                         <div class="overview-item">
                             <span class="overview-label">最近任务</span>
-                            <span class="overview-value">
-                                {{ taskStatusText(sampleDetail.tasks?.[0]?.status) }}
-                            </span>
+                            <el-tag :type="taskTagType(latestTask?.status)" effect="light">
+                                {{ taskStatusText(latestTask?.status) }}
+                            </el-tag>
                         </div>
+
+                        <div class="overview-item">
+                            <span class="overview-label">任务开始</span>
+                            <span class="overview-value">{{ formatDate(latestTask?.startedAt) }}</span>
+                        </div>
+
+                        <div class="overview-item">
+                            <span class="overview-label">任务结束</span>
+                            <span class="overview-value">{{ formatDate(latestTask?.finishedAt) }}</span>
+                        </div>
+
+                        <div v-if="latestTask?.resultPath" class="overview-item overview-item--stack">
+                            <span class="overview-label">结果路径</span>
+                            <span class="overview-path">{{ latestTask.resultPath }}</span>
+                        </div>
+
+                        <el-alert
+                          v-if="taskAlert"
+                          class="task-alert"
+                          :type="taskAlert.type"
+                          :title="taskAlert.title"
+                          :description="taskAlert.description"
+                          show-icon
+                          :closable="false"
+                        />
                     </div>
                 </el-card>
 
@@ -186,6 +211,17 @@
                                 {{ formatDate(scope.row.createdAt) }}
                             </template>
                         </el-table-column>
+                        <el-table-column label="开始时间" width="170">
+                            <template #default="scope">
+                                {{ formatDate(scope.row.startedAt) }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="结束时间" width="170">
+                            <template #default="scope">
+                                {{ formatDate(scope.row.finishedAt) }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="resultPath" label="结果路径" min-width="260" show-overflow-tooltip />
                         <el-table-column label="失败原因" min-width="360">
                             <template #default="scope">
                                 <div
@@ -234,6 +270,53 @@ const shouldPollAnalysis = computed(() => {
   const st = sampleDetail.value?.analysis_status
   return st === 'QUEUED' || st === 'RUNNING'
 })
+
+const latestTask = computed(() => sampleDetail.value?.tasks?.[0] || null)
+
+const taskAlert = computed(() => {
+  const task = latestTask.value
+  if (!task) return null
+
+  if (task.status === 'FAILED') {
+    return {
+      type: 'error',
+      title: '最近任务失败',
+      description: task.errorMessage || '任务执行失败，未返回具体原因',
+    }
+  }
+
+  if (task.status === 'RUNNING') {
+    return {
+      type: 'info',
+      title: '最近任务运行中',
+      description: task.logOutput ? taskLogPreview(task.logOutput) : '后台正在执行分析任务',
+    }
+  }
+
+  if (task.status === 'QUEUED' || task.status === 'PENDING') {
+    return {
+      type: 'warning',
+      title: '最近任务等待执行',
+      description: '任务已创建，等待后台 Worker 处理',
+    }
+  }
+
+  if (task.status === 'SUCCESS') {
+    return {
+      type: 'success',
+      title: '最近任务已完成',
+      description: task.resultPath || '分析任务已成功结束',
+    }
+  }
+
+  return null
+})
+
+const taskLogPreview = (log) => {
+  if (!log) return ''
+  const text = String(log).trim()
+  return text.length > 240 ? `${text.slice(-240)}` : text
+}
 
 const stopDetailPolling = () => {
   if (pollTimer != null) {
@@ -585,6 +668,29 @@ onUnmounted(() => {
   font-weight: 600;
   text-align: right;
   word-break: break-word;
+}
+
+.overview-item--stack {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.overview-path {
+  width: 100%;
+  padding: 8px 10px;
+  color: #303133;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.task-alert {
+  margin-top: 4px;
 }
 
 /* 与终端一致保留换行与空格 */

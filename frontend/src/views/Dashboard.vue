@@ -3,41 +3,37 @@
     <el-card shadow="never" class="welcome-card">
       <div class="welcome-content">
         <div>
-          <h2 class="welcome-title">欢迎使用 HRD 评分计算系统</h2>
+          <h2 class="welcome-title">HRD 评分计算与报告管理系统</h2>
           <p class="welcome-subtitle">
-            以下统计与列表均为<strong>当前登录账号</strong>下的真实数据；刷新页面即可更新。
-          </p>
-          <p class="welcome-note">
-            Web/API 能打开本页仅说明前端与接口可用；Celery、Redis、数据库等请在服务器侧自行巡检。
+            面向 WGS/WES 肿瘤-正常配对测序数据，完成样本导入、异步分析、HRD 结果解析与报告展示的完整流程。
           </p>
         </div>
-        <el-tag type="info" size="large">数据已接入后端</el-tag>
       </div>
     </el-card>
 
-    <el-row :gutter="20" class="stats-row">
-      <el-col :span="6">
+    <el-row :gutter="20" class="stats-row align-row">
+      <el-col :xs="24" :sm="12" :lg="6" class="dashboard-col">
         <el-card shadow="hover" class="stats-card">
           <div class="card-header">我的样本</div>
           <div class="card-value primary">{{ stats.total_samples }}</div>
           <div class="card-footer">全部上传/分析状态合计</div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :xs="24" :sm="12" :lg="6" class="dashboard-col">
         <el-card shadow="hover" class="stats-card">
           <div class="card-header">分析已完成</div>
           <div class="card-value success">{{ completedSamples }}</div>
           <div class="card-footer">样本维度 · 状态为「已完成」</div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :xs="24" :sm="12" :lg="6" class="dashboard-col">
         <el-card shadow="hover" class="stats-card">
           <div class="card-header">排队或分析中</div>
           <div class="card-value warning">{{ queuedOrRunningSamples }}</div>
           <div class="card-footer">样本维度 · 排队中 + 分析中</div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :xs="24" :sm="12" :lg="6" class="dashboard-col">
         <el-card shadow="hover" class="stats-card">
           <div class="card-header">分析失败（样本）</div>
           <div class="card-value danger">{{ failedSamples }}</div>
@@ -46,9 +42,9 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" class="content-row">
-      <el-col :span="14">
-        <el-card shadow="never" class="section-card">
+    <el-row :gutter="20" class="content-row align-row">
+      <el-col :xs="24" :lg="16" class="dashboard-col">
+        <el-card shadow="never" class="section-card task-card">
           <template #header>
             <div class="section-header">
               <span>最近分析任务</span>
@@ -64,9 +60,9 @@
             @row-click="onTaskRowClick"
             class="clickable-table"
           >
-            <el-table-column prop="sample_code" label="样本编号" min-width="140" />
-            <el-table-column prop="patient_id" label="患者编号" width="120" />
-            <el-table-column label="任务状态" width="110">
+            <el-table-column prop="sample_code" label="样本编号" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="patient_id" label="患者编号" width="130" show-overflow-tooltip />
+            <el-table-column label="任务状态" width="100">
               <template #default="scope">
                 <el-tag :type="taskTagType(scope.row.task_status)" effect="light" size="small">
                   {{ taskStatusLabel(scope.row.task_status) }}
@@ -80,7 +76,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="创建时间" min-width="160">
+            <el-table-column label="创建时间" width="170">
               <template #default="scope">
                 {{ formatTime(scope.row.created_at) }}
               </template>
@@ -99,8 +95,8 @@
         </el-card>
       </el-col>
 
-      <el-col :span="10">
-        <el-card shadow="never" class="section-card">
+      <el-col :xs="24" :lg="8" class="dashboard-col">
+        <el-card shadow="never" class="section-card dist-card">
           <template #header>
             <div class="section-header">
               <span>状态分布（真实计数）</span>
@@ -130,33 +126,43 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" class="bottom-row">
-      <el-col :span="12">
-        <el-card shadow="never" class="section-card">
+    <el-row :gutter="20" class="bottom-row align-row">
+      <el-col :xs="24" :lg="12" class="dashboard-col">
+        <el-card shadow="never" class="section-card compact-card">
           <template #header>
             <div class="section-header">
-              <span>快捷操作</span>
+              <span>待处理队列</span>
+              <el-button type="primary" link @click="goSamples">处理样本</el-button>
             </div>
           </template>
-          <div class="quick-actions">
-            <el-button type="primary" @click="goImport">服务器导入样本</el-button>
-            <el-button @click="goSamples">样本列表</el-button>
-            <el-button type="success" plain @click="goReports">查看报告</el-button>
+          <div class="queue-list">
+            <div v-for="item in workQueueItems" :key="item.label" class="queue-item">
+              <div>
+                <div class="queue-label">{{ item.label }}</div>
+                <div class="queue-desc">{{ item.desc }}</div>
+              </div>
+              <el-tag :type="item.type" effect="light">{{ item.value }}</el-tag>
+            </div>
           </div>
         </el-card>
       </el-col>
-      <el-col :span="12">
-        <el-card shadow="never" class="section-card">
+      <el-col :xs="24" :lg="12" class="dashboard-col">
+        <el-card shadow="never" class="section-card compact-card">
           <template #header>
             <div class="section-header">
-              <span>当前版本能力说明</span>
+              <span>结果与报告概览</span>
+              <el-button type="success" link @click="goReports">查看报告</el-button>
             </div>
           </template>
-          <ul class="notice-list">
-            <li>初版：WGS、WES 全流程（服务器路径导入 FASTQ，分别调用 run_wgs.sh 与 run_wes.sh）；统一报告页支持 JSON/CSV 导出与打印。</li>
-            <li>仅 SNP Panel 类型可录入但「开始分析」暂不支持；WGS、WES 可正常排队分析。</li>
-            <li>大文件浏览器分片上传、PDF 报告等未在本版本实现。</li>
-          </ul>
+          <div class="result-summary">
+            <div v-for="item in resultSummaryItems" :key="item.label" class="summary-item">
+              <span class="summary-label">{{ item.label }}</span>
+              <strong :class="item.className">{{ item.value }}</strong>
+            </div>
+          </div>
+          <p class="summary-hint">
+            最近任务中已有 HRD 评分的记录会参与阳性数量统计；完整报告从报告中心进入。
+          </p>
         </el-card>
       </el-col>
     </el-row>
@@ -184,11 +190,84 @@ const stats = reactive({
 const recentTasks = computed(() => stats.recent_tasks || [])
 
 const completedSamples = computed(() => stats.analysis_status_counts?.COMPLETED ?? 0)
+const notStartedSamples = computed(() => stats.analysis_status_counts?.NOT_STARTED ?? 0)
 const queuedOrRunningSamples = computed(() => {
   const c = stats.analysis_status_counts || {}
   return (c.QUEUED ?? 0) + (c.RUNNING ?? 0)
 })
 const failedSamples = computed(() => stats.analysis_status_counts?.FAILED ?? 0)
+const failedTasks = computed(() => stats.task_status_counts?.FAILED ?? 0)
+const pendingOrQueuedTasks = computed(() => {
+  const c = stats.task_status_counts || {}
+  return (c.PENDING ?? 0) + (c.QUEUED ?? 0)
+})
+const runningTasks = computed(() => stats.task_status_counts?.RUNNING ?? 0)
+const recentScoredTasks = computed(() =>
+  recentTasks.value.filter((task) => task.hrd_score != null)
+)
+const recentPositiveTasks = computed(() =>
+  recentScoredTasks.value.filter((task) => Number(task.hrd_score) >= hrdPositiveMin.value)
+)
+
+const workQueueItems = computed(() => [
+  {
+    label: '未开始分析',
+    desc: '已建样本但尚未启动分析，适合进入样本详情后排队',
+    value: notStartedSamples.value,
+    type: notStartedSamples.value > 0 ? 'warning' : 'info',
+  },
+  {
+    label: '排队/运行中',
+    desc: '需要关注 Celery Worker、Redis 与生信环境是否在线',
+    value: queuedOrRunningSamples.value,
+    type: queuedOrRunningSamples.value > 0 ? 'primary' : 'info',
+  },
+  {
+    label: '失败样本',
+    desc: '优先查看失败原因和 run.log，修复后可重新启动',
+    value: failedSamples.value,
+    type: failedSamples.value > 0 ? 'danger' : 'success',
+  },
+  {
+    label: '待执行任务',
+    desc: '任务表中仍处于待执行或排队状态的任务数量',
+    value: pendingOrQueuedTasks.value,
+    type: pendingOrQueuedTasks.value > 0 ? 'warning' : 'info',
+  },
+])
+
+const resultSummaryItems = computed(() => [
+  {
+    label: '已完成样本',
+    value: completedSamples.value,
+    className: 'success',
+  },
+  {
+    label: '最近有评分任务',
+    value: recentScoredTasks.value.length,
+    className: 'primary',
+  },
+  {
+    label: '最近 HRD 阳性',
+    value: recentPositiveTasks.value.length,
+    className: recentPositiveTasks.value.length > 0 ? 'danger' : 'success',
+  },
+  {
+    label: '当前阳性阈值',
+    value: hrdPositiveMin.value,
+    className: 'warning',
+  },
+  {
+    label: '运行中任务',
+    value: runningTasks.value,
+    className: runningTasks.value > 0 ? 'primary' : '',
+  },
+  {
+    label: '失败任务',
+    value: failedTasks.value,
+    className: failedTasks.value > 0 ? 'danger' : 'success',
+  },
+])
 
 const taskStatusLabels = {
   PENDING: '待执行',
@@ -239,7 +318,6 @@ const formatTime = (iso) => {
 }
 
 const goSamples = () => router.push('/samples')
-const goImport = () => router.push('/samples/import')
 const goReports = () => router.push('/reports')
 
 const onTaskRowClick = (row) => {
@@ -274,7 +352,7 @@ onMounted(() => {
 }
 
 .welcome-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   border-radius: 10px;
 }
 
@@ -308,23 +386,37 @@ onMounted(() => {
 .stats-row,
 .content-row,
 .bottom-row {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+.bottom-row {
+  margin-bottom: 0;
+}
+
+.align-row {
+  align-items: stretch;
+}
+
+.dashboard-col {
+  display: flex;
+  margin-bottom: 0;
 }
 
 .stats-card {
   border-radius: 10px;
+  width: 100%;
 }
 
 .card-header {
   color: #909399;
   font-size: 14px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .card-value {
   font-size: 28px;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .card-footer {
@@ -350,7 +442,28 @@ onMounted(() => {
 
 .section-card {
   border-radius: 10px;
-  min-height: 280px;
+  width: 100%;
+}
+
+.section-card :deep(.el-card__body) {
+  height: calc(100% - 57px);
+}
+
+.task-card {
+  min-height: 360px;
+}
+
+.dist-card {
+  min-height: 360px;
+}
+
+.compact-card {
+  min-height: 0;
+}
+
+.compact-card :deep(.el-card__body) {
+  padding-top: 14px;
+  padding-bottom: 14px;
 }
 
 .section-header {
@@ -361,13 +474,13 @@ onMounted(() => {
 }
 
 .dist-block {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .dist-title {
   font-size: 13px;
   color: #909399;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .dist-list {
@@ -379,24 +492,14 @@ onMounted(() => {
 .dist-list li {
   display: flex;
   justify-content: space-between;
-  padding: 6px 0;
+  padding: 5px 0;
   border-bottom: 1px solid #ebeef5;
   font-size: 14px;
   color: #606266;
 }
 
-.quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.notice-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #606266;
-  line-height: 1.9;
-  font-size: 14px;
+.dist-card :deep(.el-divider--horizontal) {
+  margin: 12px 0;
 }
 
 .hrd-high {
@@ -412,5 +515,90 @@ onMounted(() => {
 
 .clickable-table :deep(tbody tr) {
   cursor: pointer;
+}
+
+.clickable-table :deep(.cell) {
+  white-space: nowrap;
+}
+
+.queue-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 8px 0;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.queue-item:last-child {
+  border-bottom: 0;
+}
+
+.queue-label {
+  color: #303133;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.queue-desc {
+  color: #909399;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.result-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 12px;
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+}
+
+.summary-label {
+  color: #606266;
+  font-size: 13px;
+}
+
+.summary-item strong {
+  color: #303133;
+  font-size: 18px;
+}
+
+.summary-hint {
+  margin: 10px 0 0;
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 991px) {
+  .dashboard-col {
+    margin-bottom: 16px;
+  }
+
+  .align-row .dashboard-col:last-child {
+    margin-bottom: 0;
+  }
+
+  .task-card,
+  .dist-card {
+    min-height: 0;
+  }
 }
 </style>

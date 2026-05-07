@@ -15,11 +15,11 @@
             >
                 <el-menu-item index="/">
                     <el-icon><DataLine /></el-icon>
-                    <span>工作台概览</span>
+                    <span>系统概览</span>
                 </el-menu-item>
                 <el-menu-item index="/samples">
                     <el-icon><Files /></el-icon>
-                    <span>临床样本管理</span>
+                    <span>样本列表</span>
                 </el-menu-item>
                 <el-menu-item index="/reports">
                     <el-icon><Document /></el-icon>

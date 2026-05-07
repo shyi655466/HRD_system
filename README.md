@@ -73,15 +73,172 @@
 
 ---
 
-## 运行提示（开发）
+## 本地运行步骤（开发 / 毕设演示）
 
-1. **依赖**：MySQL、Redis；`backend/` 下 `pip install -r requirements.txt`；`frontend/` 下 `npm install`。
-2. **迁移**：在 `backend/` 执行 `python manage.py migrate`。
-3. **Web**：`python manage.py runserver 0.0.0.0:8010`（端口可按习惯调整，与 `frontend/vite.config.js` 里 `proxy` 一致即可）。
-4. **Celery Worker**：`celery -A backend worker -l info`（工作目录需能访问 `HRD_PIPELINE_*`、FASTQ 与 Conda/R 工具链，与命令行跑 `run_wgs.sh` / `run_wes.sh` 一致）。
-5. **前端**：`npm run dev`（默认 **http://localhost:5173**）。
+以下命令默认在仓库根目录执行；涉及后端命令时进入 `backend/`，涉及前端命令时进入 `frontend/`。
 
-**说明**：`manage.py recover_sample_from_disk ... --enqueue-report` 仅向 Celery **投递**生成报告任务；需 **Worker 在线且代码已更新**，才会写出 `HRD_result/HRD_report.html`。
+### 1. 准备 MySQL 与 Redis
+
+后端使用 MySQL 存储业务数据，Celery 使用 Redis 作为 broker/result backend。确保本机或服务器已有：
+
+- MySQL：默认数据库名 `hrd_db`
+- Redis：默认监听 `127.0.0.1:6379`
+
+可按实际环境创建数据库和账号，例如：
+
+```sql
+CREATE DATABASE hrd_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'hrd_app'@'%' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON hrd_db.* TO 'hrd_app'@'%';
+FLUSH PRIVILEGES;
+```
+
+开发机如果使用 Unix socket 连接 MySQL，可在 `.env` 中设置 `MYSQL_UNIX_SOCKET`。
+
+### 2. 配置 `.env`
+
+复制示例文件：
+
+```bash
+cp .env.example .env
+```
+
+最小示例：
+
+```env
+DJANGO_SECRET_KEY=django-insecure-dev-only
+DJANGO_DEBUG=true
+DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
+
+MYSQL_DATABASE=hrd_db
+MYSQL_USER=hrd_app
+MYSQL_PASSWORD=your_password
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=33061
+MYSQL_UNIX_SOCKET=
+
+CELERY_BROKER_URL=redis://127.0.0.1:6379/0
+CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/1
+
+# 服务器路径导入 FASTQ 的白名单目录；多个目录用英文逗号分隔
+HRD_ALLOWED_IMPORT_ROOTS=/data/hrd/import,/mnt/sequencing
+```
+
+如果只演示页面和 API，不跑真实 WGS/WES，可先不配置参考基因组和 Conda 生信环境；但导入 FASTQ 的路径必须位于 `HRD_ALLOWED_IMPORT_ROOTS` 之下。
+
+### 3. 安装依赖
+
+后端：
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+前端：
+
+```bash
+cd frontend
+npm install
+```
+
+生信流程依赖单独使用 Conda 环境，见 `pipeline/environment.yml`。如果要实际运行 WGS/WES，请先确认 `fastp`、`bwa`、`samtools`、`Rscript`、scarHRD 等命令和参考文件可用。
+
+### 4. 初始化数据库并创建用户
+
+```bash
+cd backend
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+也可以用 Django shell 创建普通测试用户：
+
+```bash
+python manage.py shell -c "from django.contrib.auth import get_user_model; get_user_model().objects.create_user('demo', password='demo123456')"
+```
+
+前端登录时使用该用户名和密码。
+
+### 5. 启动后端 API
+
+```bash
+cd backend
+python manage.py runserver 0.0.0.0:8010
+```
+
+后端 API 地址：`http://127.0.0.1:8010/`。
+
+### 6. 启动 Celery Worker
+
+需要实际触发 WGS/WES 分析时启动：
+
+```bash
+cd backend
+celery -A backend worker -l info
+```
+
+Worker 所在环境必须能访问：
+
+- `.env` 中配置的 MySQL / Redis
+- `HRD_ALLOWED_IMPORT_ROOTS` 下的 FASTQ 文件
+- `HRD_PIPELINE_ROOT`、`HRD_PIPELINE_WORK_ROOT`
+- Conda/R/生信工具链与参考文件
+
+**说明**：`manage.py recover_sample_from_disk ... --enqueue-report` 仅向 Celery 投递生成报告任务；需 Worker 在线且代码已更新，才会写出 `HRD_result/HRD_report.html`。
+
+### 7. 启动前端
+
+```bash
+cd frontend
+npm run dev
+```
+
+默认访问：`http://localhost:5173`。Vite 会将 `/api` 请求代理到后端，代理配置见 `frontend/vite.config.js`。
+
+### 8. 导入示例样本
+
+1. 准备 4 个 FASTQ 文件，分别对应：
+   - `TUMOR_R1`
+   - `TUMOR_R2`
+   - `NORMAL_R1`
+   - `NORMAL_R2`
+
+2. 确认这些文件位于 `.env` 的 `HRD_ALLOWED_IMPORT_ROOTS` 白名单目录下，例如：
+
+```text
+/data/hrd/import/demo/tumor_R1.fastq.gz
+/data/hrd/import/demo/tumor_R2.fastq.gz
+/data/hrd/import/demo/normal_R1.fastq.gz
+/data/hrd/import/demo/normal_R2.fastq.gz
+```
+
+3. 登录前端后进入“样本导入”页面，选择“服务器导入模式”，填写患者编号、样本编号、数据类型和 4 个服务器文件路径。
+
+4. 导入成功后进入样本详情页，WGS/WES 样本可点击“开始分析”。SNP Panel 当前仅支持录入，不支持启动分析。
+
+### 9. 运行测试
+
+后端最小测试覆盖登录、样本创建/导入、非法路径拒绝、Panel 启动分析拒绝、HRD TSV 解析：
+
+```bash
+cd backend
+python manage.py test analysis.tests -v 2
+```
+
+如果当前 MySQL 用户没有创建测试库权限，需要使用有权限的账号临时运行，例如：
+
+```bash
+MYSQL_USER=root MYSQL_PASSWORD=your_root_password MYSQL_UNIX_SOCKET=/path/to/mysql.sock \
+python manage.py test analysis.tests -v 2
+```
+
+前端构建检查：
+
+```bash
+cd frontend
+npm run build
+```
 
 ---
 

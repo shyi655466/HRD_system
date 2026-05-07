@@ -194,8 +194,11 @@ CELERY_RESULT_SERIALIZER = 'json'
 # 时区与 Django 保持一致
 CELERY_TIMEZONE = 'Asia/Shanghai'
 
+_hrd_allowed_import_roots = os.environ.get("HRD_ALLOWED_IMPORT_ROOTS", "").strip()
 HRD_ALLOWED_IMPORT_ROOTS = [
-    "/data_storage2/shiyi/git_repo/work_repo/HRD_system/pipeline/test",
+    root.strip()
+    for root in _hrd_allowed_import_roots.split(",")
+    if root.strip()
 ]
 
 # 生信 pipeline（相对仓库根目录，可用环境变量覆盖；_REPO_ROOT 见文件顶部 load_dotenv 处）
